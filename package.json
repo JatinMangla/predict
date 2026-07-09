@@ -1,0 +1,35 @@
+{
+  "name": "kundli-predict",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Offline-first Vedic astrology (Kundli) web application with rule-based predictions and optional AI assistance",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "astronomy-engine": "^2.1.19",
+    "dexie": "^4.0.11",
+    "dexie-react-hooks": "^1.1.7",
+    "luxon": "^3.5.0",
+    "next": "^15.3.0",
+    "next-auth": "^5.0.0-beta.29",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/luxon": "^3.4.2",
+    "@types/node": "^22.13.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.1.0"
+  }
+}
