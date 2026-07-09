@@ -1,0 +1,195 @@
+import type { Dict } from "./en";
+
+export const hi: Dict = {
+  // App
+  appName: "कुंडली प्रेडिक्ट",
+  tagline: "आपका वैदिक ज्योतिष साथी — बिना इंटरनेट भी चलता है",
+
+  // Auth
+  signIn: "Google से साइन इन करें",
+  signOut: "साइन आउट",
+  accessDenied: "इस खाते को इस एप्लिकेशन का उपयोग करने की अनुमति नहीं है।",
+  loginHint: "केवल स्वामी का Google खाता ही साइन इन कर सकता है।",
+
+  // Navigation
+  dashboard: "डैशबोर्ड",
+  newProfile: "नई कुंडली",
+  settings: "सेटिंग्स",
+  kundli: "कुंडली",
+  predictions: "भविष्यफल",
+  transits: "गोचर",
+  askQuestion: "प्रश्न पूछें",
+
+  // Dashboard
+  savedProfiles: "सहेजी गई प्रोफ़ाइलें",
+  noProfiles: "अभी कोई प्रोफ़ाइल नहीं। अपनी पहली कुंडली बनाएँ।",
+  todayPanchang: "आज का पंचांग",
+  createKundli: "कुंडली बनाएँ",
+  viewKundli: "कुंडली देखें",
+  deleteProfile: "हटाएँ",
+  confirmDelete: "यह प्रोफ़ाइल और इसके सहेजे प्रश्न हटाएँ?",
+
+  // Birth form
+  birthDetails: "जन्म विवरण",
+  fullName: "पूरा नाम",
+  gender: "लिंग",
+  male: "पुरुष",
+  female: "महिला",
+  other: "अन्य",
+  birthDate: "जन्म तिथि",
+  birthTime: "जन्म समय (यथासंभव सटीक)",
+  birthPlace: "जन्म स्थान",
+  searchCity: "शहर खोजने के लिए टाइप करें…",
+  manualCoords: "निर्देशांक स्वयं दर्ज करें",
+  latitude: "अक्षांश",
+  longitude: "देशांतर",
+  timezone: "समय क्षेत्र",
+  save: "सहेजें और कुंडली बनाएँ",
+  timeAccuracyNote:
+    "सटीक जन्म समय लग्न और दशाओं के लिए सबसे महत्वपूर्ण है। 5 मिनट का अंतर भी परिणाम बदल सकता है।",
+
+  // Kundli tabs
+  charts: "चार्ट",
+  planetsTab: "ग्रह",
+  vargasTab: "वर्ग कुंडली",
+  dashasTab: "दशाएँ",
+  yogasTab: "योग और दोष",
+  ashtakavargaTab: "अष्टकवर्ग",
+  numerologyTab: "अंक ज्योतिष",
+
+  // Chart
+  northIndian: "उत्तर भारतीय",
+  southIndian: "दक्षिण भारतीय",
+  lagnaChart: "लग्न कुंडली (D1)",
+  navamsaChart: "नवांश (D9)",
+  ascendant: "लग्न",
+  moonSign: "चंद्र राशि",
+  sunSign: "सूर्य राशि",
+  birthNakshatra: "जन्म नक्षत्र",
+
+  // Planet table
+  planet: "ग्रह",
+  sign: "राशि",
+  degree: "अंश",
+  nakshatra: "नक्षत्र",
+  pada: "पद",
+  house: "भाव",
+  dignity: "स्थिति",
+  state: "अवस्था",
+  retrograde: "वक्री",
+  combust: "अस्त",
+  direct: "मार्गी",
+
+  // Dignities
+  exalted: "उच्च",
+  moolatrikona: "मूलत्रिकोण",
+  own: "स्वराशि",
+  friend: "मित्र राशि",
+  neutral: "सम राशि",
+  enemy: "शत्रु राशि",
+  debilitated: "नीच",
+
+  // Dasha
+  mahadasha: "महादशा",
+  antardasha: "अंतर्दशा",
+  pratyantardasha: "प्रत्यंतर्दशा",
+  currentDasha: "वर्तमान दशा",
+  from: "से",
+  to: "तक",
+  balanceAtBirth: "जन्म के समय शेष",
+  years: "वर्ष",
+
+  // Panchang
+  tithi: "तिथि",
+  paksha: "पक्ष",
+  shukla: "शुक्ल पक्ष",
+  krishna: "कृष्ण पक्ष",
+  vara: "वार",
+  yogaP: "योग",
+  karana: "करण",
+  sunrise: "सूर्योदय",
+  sunset: "सूर्यास्त",
+
+  // Yogas
+  yogas: "योग",
+  doshas: "दोष",
+  noYogas: "कोई प्रमुख योग नहीं मिला।",
+  strengthLabel: "बल",
+  strong: "प्रबल",
+  moderate: "मध्यम",
+  mild: "सामान्य",
+
+  // Predictions
+  weekly: "साप्ताहिक",
+  monthly: "मासिक",
+  yearly: "वार्षिक",
+  predictionFor: "भविष्यफल",
+  generatedOffline: "कुंडली इंजन द्वारा — इंटरनेट की आवश्यकता नहीं",
+  areas: "जीवन क्षेत्र",
+  career: "करियर",
+  wealth: "धन",
+  health: "स्वास्थ्य",
+  relationships: "संबंध",
+  favourableDays: "शुभ दिन",
+  cautionDays: "सावधानी के दिन",
+  remedy: "उपाय",
+
+  // Transits
+  currentSky: "वर्तमान गोचर",
+  upcomingMovements: "आगामी ग्रह गोचर",
+  personalEffects: "आपकी कुंडली पर प्रभाव",
+  entersSign: "प्रवेश",
+  goesRetrograde: "वक्री होंगे",
+  goesDirect: "मार्गी होंगे",
+  fromYourMoon: "आपके चंद्रमा से",
+  favourable: "शुभ",
+  unfavourable: "चुनौतीपूर्ण",
+  neutralT: "मिश्रित",
+  sadeSati: "साढ़े साती",
+  sadeSatiRising: "प्रथम चरण — शनि चंद्रमा से 12वें भाव में",
+  sadeSatiPeak: "शिखर चरण — शनि आपकी चंद्र राशि पर",
+  sadeSatiSetting: "अंतिम चरण — शनि चंद्रमा से 2रे भाव में",
+  sadeSatiNone: "सक्रिय नहीं",
+
+  // Q&A
+  askPlaceholder: "करियर, विवाह, स्वास्थ्य, धन, शिक्षा के बारे में पूछें…",
+  ask: "पूछें",
+  askAI: "AI से पूछें",
+  engineAnswer: "कुंडली इंजन",
+  aiAnswer: "AI-सहायता",
+  confidence: "विश्वसनीयता",
+  aiUnavailable: "AI उपलब्ध नहीं है (ऑफ़लाइन या API कुंजी नहीं)। कुंडली इंजन का उत्तर दिखाया जा रहा है।",
+  aiThinking: "AI से परामर्श हो रहा है…",
+  lowConfidenceNote: "इंजन की विश्वसनीयता कम है — गहन विश्लेषण के लिए AI से पूछ सकते हैं।",
+  history: "पिछले प्रश्न",
+
+  // Numerology
+  birthdayNumber: "मूलांक",
+  lifePathNumber: "भाग्यांक",
+  expressionNumber: "नामांक",
+  soulUrgeNumber: "आत्मा अंक",
+  personalityNumber: "व्यक्तित्व अंक",
+  personalYear: "व्यक्तिगत वर्ष",
+  personalMonth: "व्यक्तिगत माह",
+  rulingPlanet: "स्वामी ग्रह",
+  luckyColors: "शुभ रंग",
+  luckyDays: "शुभ दिन",
+
+  // Settings
+  language: "भाषा",
+  chartStyle: "चार्ट शैली",
+  aiStatus: "AI सहायता",
+  aiConfigured: "कॉन्फ़िगर है",
+  aiNotConfigured: "कॉन्फ़िगर नहीं — Vercel पर्यावरण सेटिंग्स में API कुंजी जोड़ें",
+  dataNote: "सभी प्रोफ़ाइलें केवल इसी डिवाइस पर संग्रहीत हैं (ब्राउज़र स्टोरेज)।",
+  exportData: "डेटा निर्यात करें (JSON)",
+  importData: "डेटा आयात करें",
+
+  // Misc
+  loading: "गणना हो रही है…",
+  error: "कुछ गड़बड़ हुई",
+  offlineReady: "ऑफ़लाइन चलता है",
+  at: "को",
+  born: "जन्म",
+  in: "में",
+};
