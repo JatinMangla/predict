@@ -1,0 +1,17 @@
+{
+  "name": "Kundli Predict",
+  "short_name": "Kundli",
+  "description": "Offline-first Vedic astrology: kundli, dashas, predictions, transits and numerology.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1021",
+  "theme_color": "#0d1021",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

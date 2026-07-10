@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+@theme {
+  --color-surface: #0d1021;
+  --color-surface-2: #161a30;
+  --color-surface-3: #1f2440;
+  --color-line: #2c3358;
+  --color-ink: #e8eaf6;
+  --color-ink-soft: #9aa2c8;
+  --color-gold: #d4a94e;
+  --color-gold-soft: #f0d89a;
+  --color-good: #4ade80;
+  --color-caution: #f87171;
+  --color-mixed: #fbbf24;
+}
+
+:root {
+  /* Numerology accent — overridden per profile by ProfileTheme */
+  --accent: #d4a94e;
+  --accent-soft: rgba(212, 169, 78, 0.14);
+}
+
+html {
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Noto Sans", "Noto Sans Devanagari", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Card primitive used across the app */
+.card {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-line);
+  border-radius: 0.75rem;
+}
+
+.accent-text {
+  color: var(--accent);
+}
+.accent-bg {
+  background: var(--accent-soft);
+}
+.accent-border {
+  border-color: var(--accent);
+}
+
+/* Subtle star-field backdrop */
+.starfield {
+  background-image: radial-gradient(1px 1px at 25% 15%, rgba(255, 255, 255, 0.35) 0, transparent 100%),
+    radial-gradient(1px 1px at 70% 40%, rgba(255, 255, 255, 0.25) 0, transparent 100%),
+    radial-gradient(1.5px 1.5px at 45% 75%, rgba(212, 169, 78, 0.35) 0, transparent 100%),
+    radial-gradient(1px 1px at 85% 85%, rgba(255, 255, 255, 0.3) 0, transparent 100%),
+    radial-gradient(1px 1px at 10% 60%, rgba(255, 255, 255, 0.2) 0, transparent 100%);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 6px;
+}
