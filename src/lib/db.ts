@@ -19,16 +19,36 @@ export interface SettingRecord {
   value: string;
 }
 
+/** One row per AI call — powers the visible usage/cost meter and daily cap */
+export interface AiUsageRecord {
+  id?: number;
+  /** local calendar date yyyy-mm-dd */
+  date: string;
+  provider: string;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  createdAt: number;
+}
+
 const db = new Dexie("kundli-predict") as Dexie & {
   profiles: EntityTable<StoredProfile, "id">;
   qaHistory: EntityTable<QARecord, "id">;
   settings: EntityTable<SettingRecord, "key">;
+  aiUsage: EntityTable<AiUsageRecord, "id">;
 };
 
 db.version(1).stores({
   profiles: "++id, name, createdAt",
   qaHistory: "++id, profileId, createdAt",
   settings: "key",
+});
+
+db.version(2).stores({
+  profiles: "++id, name, createdAt",
+  qaHistory: "++id, profileId, createdAt",
+  settings: "key",
+  aiUsage: "++id, date, createdAt",
 });
 
 export { db };

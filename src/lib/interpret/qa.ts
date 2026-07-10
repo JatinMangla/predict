@@ -223,14 +223,27 @@ function fmtMonthYear(ms: number, lang: "en" | "hi"): string {
   });
 }
 
-/** Analyse an area of life and produce a 0–100 favourability score + reasons */
+interface AreaAnalysis {
+  score: number;
+  posEn: string[];
+  posHi: string[];
+  negEn: string[];
+  negHi: string[];
+}
+
+/**
+ * Analyse an area of life: 0–100 favourability score plus SEPARATE lists of
+ * supportive factors and challenges, so answers always show both sides.
+ */
 function analyseArea(
   kundli: Kundli,
   houses: number[],
   karakas: PlanetId[]
-): { score: number; reasonsEn: string[]; reasonsHi: string[] } {
-  const reasonsEn: string[] = [];
-  const reasonsHi: string[] = [];
+): AreaAnalysis {
+  const posEn: string[] = [];
+  const posHi: string[] = [];
+  const negEn: string[] = [];
+  const negHi: string[] = [];
   let total = 0;
   let weight = 0;
 
@@ -241,18 +254,23 @@ function analyseArea(
     weight += 2;
     const lordName = PLANET_NAMES[lord.id];
     if (ls >= 60) {
-      reasonsEn.push(
+      posEn.push(
         `The ${ordinal(h)} lord ${lordName.en} is strong (${lord.dignity}) in your ${ordinal(lord.house)} house.`
       );
-      reasonsHi.push(
+      posHi.push(
         `${h}वें भाव के स्वामी ${lordName.hi} आपके ${lord.house}वें भाव में बली हैं।`
       );
-    } else if (ls <= 40) {
-      reasonsEn.push(
-        `The ${ordinal(h)} lord ${lordName.en} is weak (${lord.dignity}${lord.combust ? ", combust" : ""}) in the ${ordinal(lord.house)} house, so results need extra effort.`
+    } else if (ls <= 45) {
+      const flaws = [
+        lord.dignity === "debilitated" ? "debilitated" : lord.dignity === "enemy" ? "in an enemy sign" : "weak",
+        lord.combust ? "combust" : "",
+        [6, 8, 12].includes(lord.house) ? `placed in the difficult ${ordinal(lord.house)} house` : "",
+      ].filter(Boolean).join(", ");
+      negEn.push(
+        `The ${ordinal(h)} lord ${lordName.en} is ${flaws} — results in this area come slower and demand more effort.`
       );
-      reasonsHi.push(
-        `${h}वें भाव के स्वामी ${lordName.hi} ${lord.house}वें भाव में निर्बल हैं, अतः फल के लिए अधिक प्रयास चाहिए।`
+      negHi.push(
+        `${h}वें भाव के स्वामी ${lordName.hi} निर्बल${lord.combust ? "/अस्त" : ""} हैं${[6, 8, 12].includes(lord.house) ? ` और कठिन ${lord.house}वें भाव में हैं` : ""} — इस क्षेत्र के फल धीमे और अधिक परिश्रम से मिलेंगे।`
       );
     }
 
@@ -263,23 +281,34 @@ function analyseArea(
       weight += 1;
       const occName = PLANET_NAMES[occ.id];
       if (benefic && s >= 50) {
-        reasonsEn.push(`Benefic ${occName.en} occupies the ${ordinal(h)} house and supports it.`);
-        reasonsHi.push(`शुभ ग्रह ${occName.hi} ${h}वें भाव में स्थित होकर उसे बल देते हैं।`);
+        posEn.push(`Benefic ${occName.en} occupies the ${ordinal(h)} house and supports it.`);
+        posHi.push(`शुभ ग्रह ${occName.hi} ${h}वें भाव में स्थित होकर उसे बल देते हैं।`);
       } else if (!benefic && NATURAL_MALEFICS.includes(occ.id)) {
-        reasonsEn.push(`${occName.en} in the ${ordinal(h)} house adds pressure and delays here.`);
-        reasonsHi.push(`${h}वें भाव में ${occName.hi} दबाव और विलंब देते हैं।`);
+        negEn.push(`${occName.en} sits in the ${ordinal(h)} house — expect friction, delays or interruptions in this area.`);
+        negHi.push(`${h}वें भाव में ${occName.hi} — इस क्षेत्र में टकराव, विलंब या बाधाएँ संभावित हैं।`);
       }
     }
 
     const aspects = aspectingPlanets(kundli, h);
     const beneficAspects = aspects.filter((p) => NATURAL_BENEFICS.includes(p.id));
+    const maleficAspects = aspects.filter((p) =>
+      NATURAL_MALEFICS.includes(p.id) && !occupants(kundli, h).some((o) => o.id === p.id)
+    );
     if (beneficAspects.length > 0) {
       total += 60;
       weight += 1;
       const names = beneficAspects.map((p) => PLANET_NAMES[p.id].en).join(", ");
       const namesHi = beneficAspects.map((p) => PLANET_NAMES[p.id].hi).join(", ");
-      reasonsEn.push(`${names} aspect${beneficAspects.length > 1 ? "" : "s"} the ${ordinal(h)} house — a protective influence.`);
-      reasonsHi.push(`${namesHi} की दृष्टि ${h}वें भाव पर है — यह रक्षक प्रभाव है।`);
+      posEn.push(`${names} aspect${beneficAspects.length > 1 ? "" : "s"} the ${ordinal(h)} house — a protective influence.`);
+      posHi.push(`${namesHi} की दृष्टि ${h}वें भाव पर है — यह रक्षक प्रभाव है।`);
+    }
+    if (maleficAspects.length > 0) {
+      total += 42;
+      weight += 1;
+      const names = maleficAspects.map((p) => PLANET_NAMES[p.id].en).join(", ");
+      const namesHi = maleficAspects.map((p) => PLANET_NAMES[p.id].hi).join(", ");
+      negEn.push(`${names} aspect${maleficAspects.length > 1 ? "" : "s"} the ${ordinal(h)} house, adding stress and obstacles to it.`);
+      negHi.push(`${namesHi} की दृष्टि ${h}वें भाव पर है — तनाव और बाधाएँ बढ़ती हैं।`);
     }
   }
 
@@ -290,16 +319,16 @@ function analyseArea(
     weight += 1;
     const name = PLANET_NAMES[k];
     if (s >= 60) {
-      reasonsEn.push(`Karaka ${name.en} is well placed (${p.dignity}), a natural support for this area.`);
-      reasonsHi.push(`कारक ग्रह ${name.hi} शुभ स्थिति में हैं — इस क्षेत्र के लिए स्वाभाविक सहारा।`);
-    } else if (s <= 40) {
-      reasonsEn.push(`Karaka ${name.en} is weak (${p.dignity}${p.combust ? ", combust" : ""}), so timing matters more than usual.`);
-      reasonsHi.push(`कारक ग्रह ${name.hi} निर्बल हैं, अतः समय का चुनाव विशेष महत्व रखता है।`);
+      posEn.push(`Karaka ${name.en} is well placed (${p.dignity}), a natural support for this area.`);
+      posHi.push(`कारक ग्रह ${name.hi} शुभ स्थिति में हैं — इस क्षेत्र के लिए स्वाभाविक सहारा।`);
+    } else if (s <= 45) {
+      negEn.push(`Karaka ${name.en} is weak (${p.dignity}${p.combust ? ", combust" : ""}) — the natural significator itself gives limited support here.`);
+      negHi.push(`कारक ग्रह ${name.hi} निर्बल${p.combust ? "/अस्त" : ""} हैं — स्वाभाविक कारक से ही सीमित सहारा मिलेगा।`);
     }
   }
 
   const score = weight > 0 ? Math.round(total / weight) : 50;
-  return { score, reasonsEn, reasonsHi };
+  return { score, posEn, posHi, negEn, negHi };
 }
 
 /** Main entry: answer a free-text question from the kundli */
@@ -330,7 +359,7 @@ export function answerQuestion(
 
   const def = INTENTS[intent];
   const karakas = def.karakaKey ? KARAKAS[def.karakaKey] : [];
-  const { score, reasonsEn, reasonsHi } = analyseArea(kundli, def.houses, karakas);
+  const { score, posEn, posHi, negEn, negHi } = analyseArea(kundli, def.houses, karakas);
 
   // Dasha relevance
   const chain = activeDashas(kundli.dasha, nowMs);
@@ -377,23 +406,34 @@ export function answerQuestion(
         ? `आपकी कुंडली ${def.label.hi} के लिए मध्यम समर्थन दिखाती है — प्रयास और समय परिणाम तय करेंगे।`
         : `आपकी कुंडली ${def.label.hi} में चुनौतियाँ दिखाती है; फल मिलेंगे, पर विलंब और परिश्रम के साथ।`;
 
-  const topReasonsEn = reasonsEn.slice(0, 4);
-  const topReasonsHi = reasonsHi.slice(0, 4);
+  // Always present BOTH sides — never a one-sided reading
+  const topPosEn = posEn.slice(0, 3);
+  const topPosHi = posHi.slice(0, 3);
+  const topNegEn = negEn.slice(0, 3);
+  const topNegHi = negHi.slice(0, 3);
 
-  const answerEn = [
-    verdictEn,
-    ...topReasonsEn,
-    dashaLineEn,
-    timingEn,
-  ]
+  const posBlockEn = topPosEn.length
+    ? `Supportive factors: ${topPosEn.join(" ")}`
+    : `Supportive factors: none stand out strongly in this area of your chart.`;
+  const posBlockHi = topPosHi.length
+    ? `अनुकूल पक्ष: ${topPosHi.join(" ")}`
+    : `अनुकूल पक्ष: इस क्षेत्र में कोई विशेष बलवान योग नहीं है।`;
+  const negBlockEn = topNegEn.length
+    ? `Challenges: ${topNegEn.join(" ")}`
+    : `Challenges: no major afflictions in this area — a genuinely clean indication.`;
+  const negBlockHi = topNegHi.length
+    ? `चुनौतियाँ: ${topNegHi.join(" ")}`
+    : `चुनौतियाँ: इस क्षेत्र में कोई बड़ा दोष नहीं — वास्तव में स्वच्छ संकेत।`;
+
+  const answerEn = [verdictEn, posBlockEn, negBlockEn, dashaLineEn, timingEn]
     .filter(Boolean)
-    .join(" ");
-  const answerHi = [verdictHi, ...topReasonsHi, dashaLineHi, timingHi]
+    .join("\n\n");
+  const answerHi = [verdictHi, posBlockHi, negBlockHi, dashaLineHi, timingHi]
     .filter(Boolean)
-    .join(" ");
+    .join("\n\n");
 
   // Confidence: how much concrete evidence we found + decisiveness
-  const evidence = Math.min(20, (topReasonsEn.length + windows.length) * 5);
+  const evidence = Math.min(20, (topPosEn.length + topNegEn.length + windows.length) * 4);
   const decisiveness = Math.min(15, Math.abs(finalScore - 50));
   const confidence = Math.min(95, 55 + evidence + decisiveness);
 
@@ -401,7 +441,7 @@ export function answerQuestion(
     intent,
     confidence,
     score: finalScore,
-    factors: topReasonsEn,
+    factors: [...topPosEn, ...topNegEn],
     answer: { en: answerEn, hi: answerHi },
   };
 }

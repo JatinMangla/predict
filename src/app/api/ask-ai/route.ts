@@ -82,22 +82,35 @@ const SYSTEM_PROMPT = (lang: "en" | "hi") =>
   [
     "You are an expert Vedic astrologer (Jyotish) with deep knowledge of Parashari principles: house significations, planetary dignities, yogas, Vimshottari dashas and gochar transits.",
     "Read the provided birth chart carefully and answer the question specifically from THIS chart — cite the exact placements, lords, dashas or yogas that support each point.",
-    "Be honest and balanced: mention both supportive and challenging factors. Offer at most one simple, non-commercial remedy if relevant.",
-    "Never invent placements not present in the data. Keep the answer to 150-250 words.",
+    "BE COMPLETELY HONEST AND UNBIASED. Do NOT sugar-coat, do NOT give false reassurance, and do NOT skew positive. If the chart shows affliction, delay, loss, conflict, health risk or failure in the asked area, state it plainly and explain why.",
+    "Structure every answer with BOTH sides: first 'Supportive factors:' listing genuine strengths, then 'Challenges:' listing every relevant negative factor with equal detail. If one side is empty, say so explicitly rather than padding.",
+    "End with a one-line realistic verdict (favourable / mixed / unfavourable and why). Offer at most one simple, non-commercial remedy only if genuinely relevant.",
+    "Never invent placements not present in the data. Keep the answer to 150-280 words.",
     lang === "hi"
-      ? "उत्तर हिंदी में दें।"
+      ? "उत्तर हिंदी में दें। 'अनुकूल पक्ष:' और 'चुनौतियाँ:' शीर्षकों का प्रयोग करें।"
       : "Answer in English.",
   ].join(" ");
 
+export interface AiUsage {
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+}
+
+/** claude-opus-4-8: $5/M input, $25/M output */
+function claudeCost(inTok: number, outTok: number): number {
+  return (inTok * 5 + outTok * 25) / 1_000_000;
+}
+
 async function askClaude(
   body: z.infer<typeof BodySchema>
-): Promise<string | null> {
+): Promise<{ text: string; usage: AiUsage } | null> {
   if (!process.env.ANTHROPIC_API_KEY) return null;
   try {
     const client = new Anthropic();
     const response = await client.messages.create({
       model: "claude-opus-4-8",
-      max_tokens: 1024,
+      max_tokens: 1200,
       system: SYSTEM_PROMPT(body.lang),
       messages: [{ role: "user", content: buildPrompt(body) }],
     });
@@ -106,16 +119,29 @@ async function askClaude(
       .filter((b) => b.type === "text")
       .map((b) => b.text)
       .join("");
-    return text || null;
+    if (!text) return null;
+    const inTok = response.usage.input_tokens;
+    const outTok = response.usage.output_tokens;
+    return {
+      text,
+      usage: {
+        inputTokens: inTok,
+        outputTokens: outTok,
+        costUsd: claudeCost(inTok, outTok),
+      },
+    };
   } catch {
     return null;
   }
 }
 
 async function askGemini(
-  body: z.infer<typeof BodySchema>
-): Promise<string | null> {
-  const key = process.env.GEMINI_API_KEY;
+  body: z.infer<typeof BodySchema>,
+  clientKey: string | null
+): Promise<{ text: string; usage: AiUsage } | null> {
+  // Server key first; otherwise the user's own free-tier key sent from the
+  // browser (stored only client-side).
+  const key = process.env.GEMINI_API_KEY || clientKey;
   if (!key) return null;
   try {
     const res = await fetch(
@@ -131,7 +157,7 @@ async function askGemini(
             parts: [{ text: SYSTEM_PROMPT(body.lang) }],
           },
           contents: [{ parts: [{ text: buildPrompt(body) }] }],
-          generationConfig: { maxOutputTokens: 1024 },
+          generationConfig: { maxOutputTokens: 1200 },
         }),
         signal: AbortSignal.timeout(45_000),
       }
@@ -142,7 +168,15 @@ async function askGemini(
       data?.candidates?.[0]?.content?.parts
         ?.map((p: { text?: string }) => p.text ?? "")
         .join("");
-    return text || null;
+    if (!text) return null;
+    return {
+      text,
+      usage: {
+        inputTokens: data?.usageMetadata?.promptTokenCount ?? 0,
+        outputTokens: data?.usageMetadata?.candidatesTokenCount ?? 0,
+        costUsd: 0, // Gemini flash free tier
+      },
+    };
   } catch {
     return null;
   }
@@ -164,14 +198,28 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid-request" }, { status: 400 });
   }
 
-  const claudeAnswer = await askClaude(body);
-  if (claudeAnswer) {
-    return NextResponse.json({ answer: claudeAnswer, provider: "claude" });
+  // Optional user-supplied free Gemini key (kept in their browser only)
+  const rawClientKey = req.headers.get("x-gemini-key") ?? "";
+  const clientKey = /^[A-Za-z0-9_-]{20,80}$/.test(rawClientKey)
+    ? rawClientKey
+    : null;
+
+  const claude = await askClaude(body);
+  if (claude) {
+    return NextResponse.json({
+      answer: claude.text,
+      provider: "claude",
+      usage: claude.usage,
+    });
   }
 
-  const geminiAnswer = await askGemini(body);
-  if (geminiAnswer) {
-    return NextResponse.json({ answer: geminiAnswer, provider: "gemini" });
+  const gemini = await askGemini(body, clientKey);
+  if (gemini) {
+    return NextResponse.json({
+      answer: gemini.text,
+      provider: "gemini",
+      usage: gemini.usage,
+    });
   }
 
   return NextResponse.json({ error: "no-ai-available" }, { status: 503 });

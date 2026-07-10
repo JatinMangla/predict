@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { computeKundli } from "@/lib/astro/kundli";
 import { answerQuestion, detectIntent, ESCALATE_THRESHOLD } from "./qa";
-import { weeklyPrediction, monthlyPrediction, yearlyPrediction } from "./predictions";
+import { dailyPrediction, weeklyPrediction, monthlyPrediction, yearlyPrediction } from "./predictions";
 import { planetReading, currentDashaReading } from "./reading";
 
 const kundli = computeKundli({
@@ -42,9 +42,30 @@ describe("qa engine", () => {
     expect(a.intent).toBe("general");
     expect(a.confidence).toBeLessThan(ESCALATE_THRESHOLD);
   });
+  it("always shows BOTH supportive factors and challenges (unbiased)", () => {
+    for (const q of ["How is my career?", "When will I get married?", "Will I be rich?"]) {
+      const a = answerQuestion(q, kundli, NOW);
+      expect(a.answer.en).toContain("Supportive factors:");
+      expect(a.answer.en).toContain("Challenges:");
+      expect(a.answer.hi).toContain("अनुकूल पक्ष:");
+      expect(a.answer.hi).toContain("चुनौतियाँ:");
+    }
+  });
 });
 
 describe("predictions", () => {
+  it("daily includes tarabala and chandra bala sections", () => {
+    const p = dailyPrediction(kundli, NOW);
+    expect(p.period).toBe("daily");
+    const titles = p.sections.map((s) => s.title.en).join(" | ");
+    expect(titles).toContain("Tarabala");
+    expect(titles).toContain("Chandra Bala");
+    expect(p.summary.en.length).toBeGreaterThan(20);
+    for (const v of Object.values(p.areas)) {
+      expect(v).toBeGreaterThanOrEqual(5);
+      expect(v).toBeLessThanOrEqual(95);
+    }
+  });
   it("weekly has summary, sections, day lists", () => {
     const p = weeklyPrediction(kundli, NOW);
     expect(p.summary.en.length).toBeGreaterThan(20);

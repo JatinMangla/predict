@@ -26,7 +26,7 @@ export interface PredictionSection {
 }
 
 export interface Prediction {
-  period: "weekly" | "monthly" | "yearly";
+  period: "daily" | "weekly" | "monthly" | "yearly";
   rangeStart: number;
   rangeEnd: number;
   summary: Bi;
@@ -166,6 +166,122 @@ const WEEKDAY: Record<"en" | "hi", string[]> = {
   en: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
   hi: ["रविवार", "सोमवार", "मंगलवार", "बुधवार", "गुरुवार", "शुक्रवार", "शनिवार"],
 };
+
+/**
+ * Tarabala: count from birth nakshatra to the day's nakshatra (inclusive),
+ * cycled in 9s. Classical qualities — 3 (Vipat), 5 (Pratyari) and 7 (Vadha)
+ * are adverse; 1 (Janma) is mixed; the rest are favourable.
+ */
+const TARABALA: { name: Bi; good: boolean | null }[] = [
+  { name: { en: "Janma (birth star)", hi: "जन्म तारा" }, good: null },
+  { name: { en: "Sampat (wealth)", hi: "संपत् तारा" }, good: true },
+  { name: { en: "Vipat (danger)", hi: "विपत् तारा" }, good: false },
+  { name: { en: "Kshema (well-being)", hi: "क्षेम तारा" }, good: true },
+  { name: { en: "Pratyari (obstacle)", hi: "प्रत्यरि तारा" }, good: false },
+  { name: { en: "Sadhaka (achievement)", hi: "साधक तारा" }, good: true },
+  { name: { en: "Vadha (harm)", hi: "वध तारा" }, good: false },
+  { name: { en: "Mitra (friend)", hi: "मैत्र तारा" }, good: true },
+  { name: { en: "Ati-Mitra (great friend)", hi: "अति मैत्र तारा" }, good: true },
+];
+
+export function dailyPrediction(kundli: Kundli, nowMs = Date.now()): Prediction {
+  const moonSign = natalMoonSign(kundli);
+  const natalMoon = kundli.planets.find((p) => p.id === "Moon")!;
+  const end = nowMs + DAY_MS;
+
+  const pos = currentPositions(nowMs);
+  const transitMoon = pos.find((p) => p.id === "Moon")!;
+
+  // Tarabala from the day's Moon nakshatra
+  const dayNak = Math.floor((transitMoon.longitude % 360) / (360 / 27)) % 27;
+  const taraIdx = (((dayNak - natalMoon.nakshatra + 27) % 27) % 9 + 9) % 9;
+  const tara = TARABALA[taraIdx];
+
+  // Chandra bala: transiting Moon's house from the natal Moon
+  const chandraHouse = houseFromMoon(moonSign, transitMoon.sign);
+  const chandraGood = FAVOURABLE_FROM_MOON.Moon.includes(chandraHouse);
+
+  const sections: PredictionSection[] = [];
+
+  sections.push({
+    title: { en: "Tarabala", hi: "ताराबल" },
+    body: {
+      en: `Today's Moon is in the ${tara.name.en} position from your birth star — ${
+        tara.good === true
+          ? "a supportive star day for new starts and important work."
+          : tara.good === false
+            ? "an adverse star day: avoid launching new ventures, travel decisions and big commitments; routine work is fine."
+            : "a mixed day (your own birth star): emotions run strong — good for reflection, neutral for new starts."
+      }`,
+      hi: `आज का चंद्र आपके जन्म नक्षत्र से ${tara.name.hi} स्थिति में है — ${
+        tara.good === true
+          ? "शुभ तारा दिन: नए कार्य और महत्वपूर्ण निर्णयों के लिए अनुकूल।"
+          : tara.good === false
+            ? "प्रतिकूल तारा दिन: नए कार्य, यात्रा-निर्णय और बड़ी प्रतिबद्धताओं से बचें; नियमित कार्य ठीक हैं।"
+            : "मिश्रित दिन (स्वयं का जन्म नक्षत्र): भावनाएँ प्रबल — चिंतन हेतु उत्तम, नई शुरुआत हेतु सम।"
+      }`,
+    },
+    tone: tara.good === true ? "good" : tara.good === false ? "caution" : "mixed",
+  });
+
+  sections.push({
+    title: { en: "Chandra Bala", hi: "चंद्रबल" },
+    body: {
+      en: `The Moon transits your ${chandraHouse}th house from natal Moon — ${
+        chandraGood
+          ? "the mind is supported today; conversations, meetings and decisions flow more easily."
+          : "a weaker moon position; the mind may feel restless or negative — postpone emotionally charged decisions."
+      }`,
+      hi: `चंद्रमा आपके जन्म-चंद्र से ${chandraHouse}वें भाव में गोचर कर रहा है — ${
+        chandraGood
+          ? "आज मनोबल अनुकूल है; वार्ता, भेंट और निर्णय सहज रहेंगे।"
+          : "चंद्रबल कमजोर है; मन अशांत या नकारात्मक रह सकता है — भावनात्मक निर्णय टालें।"
+      }`,
+    },
+    tone: chandraGood ? "good" : "caution",
+  });
+
+  sections.push(dashaSection(kundli, nowMs));
+  sections.push(...slowTransitSections(kundli, nowMs));
+
+  const sat = pos.find((p) => p.id === "Saturn")!;
+  const phase = sadeSatiPhase(sat.sign, moonSign);
+  const ss = sadeSatiSection(phase);
+  if (ss) sections.push(ss);
+
+  const areas = computeAreas(kundli, nowMs);
+  // Blend the day factors into the area scores so daily differs from weekly
+  const dayShift = (tara.good === true ? 6 : tara.good === false ? -8 : -2) + (chandraGood ? 5 : -5);
+  const clamp = (n: number) => Math.max(5, Math.min(95, n + dayShift));
+  areas.career = clamp(areas.career);
+  areas.wealth = clamp(areas.wealth);
+  areas.health = clamp(areas.health);
+  areas.relationships = clamp(areas.relationships);
+
+  const avg = Math.round((areas.career + areas.wealth + areas.health + areas.relationships) / 4);
+  return {
+    period: "daily",
+    rangeStart: nowMs,
+    rangeEnd: end,
+    summary: {
+      en:
+        avg >= 58
+          ? "A favourable day — star and moon strength are with you. Schedule important conversations, starts and decisions today."
+          : avg >= 45
+            ? "An average day with clear positives and negatives below — act on routine matters, defer the biggest calls to a stronger day."
+            : "A challenging day — tarabala/chandrabala are weak. Stick to routine, avoid new launches and conflicts, and rest well.",
+      hi:
+        avg >= 58
+          ? "अनुकूल दिन — ताराबल और चंद्रबल आपके साथ हैं। महत्वपूर्ण वार्ता, शुरुआत और निर्णय आज करें।"
+          : avg >= 45
+            ? "सामान्य दिन — नीचे स्पष्ट अनुकूल व प्रतिकूल पक्ष दिए हैं; नियमित कार्य करें, सबसे बड़े निर्णय बेहतर दिन तक टालें।"
+            : "चुनौतीपूर्ण दिन — ताराबल/चंद्रबल कमजोर हैं। दिनचर्या पर रहें, नई शुरुआत व टकराव टालें, विश्राम करें।",
+    },
+    sections,
+    areas,
+    sadeSati: phase,
+  };
+}
 
 export function weeklyPrediction(kundli: Kundli, nowMs = Date.now()): Prediction {
   const moonSign = natalMoonSign(kundli);

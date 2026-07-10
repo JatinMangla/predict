@@ -1,10 +1,10 @@
 "use client";
 
-// Q&A: every question is answered instantly by the offline kundli engine.
-// If confidence is low (and the app is online + AI configured), the user is
-// offered AI escalation; an explicit "Ask AI" button is always available.
+// Q&A: every question is answered instantly by the offline kundli engine
+// with BOTH supportive factors and challenges. AI escalation respects the
+// user's AI mode and daily limit; usage + estimated cost stay visible.
 
-import { use, useEffect, useRef, useState } from "react";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useKundli } from "@/lib/useKundli";
@@ -12,7 +12,15 @@ import { useI18n } from "@/lib/i18n";
 import { AppShell } from "@/components/AppShell";
 import { ProfileTheme } from "@/components/ProfileTheme";
 import { answerQuestion, ESCALATE_THRESHOLD } from "@/lib/interpret/qa";
-import { buildKundliSummary } from "@/lib/kundliSummary";
+import {
+  getAiConfig,
+  getUsageSummary,
+  callAi,
+  aiAvailable,
+  fmtCost,
+  type AiConfig,
+  type UsageSummary,
+} from "@/lib/aiClient";
 import { db, type QARecord } from "@/lib/db";
 
 interface ChatItem {
@@ -22,6 +30,7 @@ interface ChatItem {
   confidence?: number;
   provider?: string;
   lowConfidence?: boolean;
+  costUsd?: number;
 }
 
 export default function AskPage({ params }: { params: Promise<{ id: string }> }) {
@@ -32,7 +41,9 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
   const [items, setItems] = useState<ChatItem[]>([]);
   const [question, setQuestion] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
-  const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
+  const [cfg, setCfg] = useState<AiConfig | null>(null);
+  const [usage, setUsage] = useState<UsageSummary | null>(null);
+  const [notice, setNotice] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const history = useLiveQuery(
@@ -46,16 +57,22 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
     [profileId]
   );
 
-  useEffect(() => {
-    fetch("/api/ask-ai")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setAiAvailable(Boolean(d && (d.claude || d.gemini))))
-      .catch(() => setAiAvailable(false));
+  const refreshUsage = useCallback(() => {
+    getUsageSummary().then(setUsage);
   }, []);
+
+  useEffect(() => {
+    getAiConfig().then(setCfg);
+    refreshUsage();
+  }, [refreshUsage]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [items]);
+
+  const canUseAi = cfg !== null && cfg.mode !== "never" && aiAvailable(cfg);
+  const limitReached =
+    cfg !== null && usage !== null && usage.callsToday >= cfg.dailyLimit;
 
   const saveRecord = async (rec: Omit<QARecord, "id">) => {
     try {
@@ -65,8 +82,46 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
     }
   };
 
+  const askAI = useCallback(
+    async (q: string, auto = false) => {
+      if (!kundli || !cfg || aiBusy) return;
+      if (limitReached) {
+        if (!auto) setNotice(t("aiLimitReached"));
+        return;
+      }
+      setAiBusy(true);
+      setNotice("");
+      const result = await callAi(q, kundli, lang, cfg);
+      setAiBusy(false);
+      refreshUsage();
+      if (typeof result === "string") {
+        if (result === "limit-reached") setNotice(t("aiLimitReached"));
+        else if (!auto) setNotice(t("aiUnavailable"));
+        return;
+      }
+      setItems((prev) => [
+        ...prev,
+        {
+          question: q,
+          answer: result.answer,
+          source: "ai",
+          provider: result.provider,
+          costUsd: result.costUsd,
+        },
+      ]);
+      void saveRecord({
+        profileId,
+        question: q,
+        answer: result.answer,
+        source: "ai",
+        createdAt: Date.now(),
+      });
+    },
+    [kundli, cfg, aiBusy, limitReached, lang, t, profileId, refreshUsage]
+  );
+
   const askEngine = (q: string) => {
-    if (!kundli) return;
+    if (!kundli || !cfg) return;
     const result = answerQuestion(q, kundli);
     const answer = lang === "hi" ? result.answer.hi : result.answer.en;
     const low = result.confidence < ESCALATE_THRESHOLD;
@@ -88,53 +143,11 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
       confidence: result.confidence,
       createdAt: Date.now(),
     });
-    // Auto-escalate to AI when the engine isn't confident
-    if (low && aiAvailable && navigator.onLine) {
+    // AI escalation per user's mode: always → every question; fallback → low confidence
+    const shouldEscalate =
+      cfg.mode === "always" || (cfg.mode === "fallback" && low);
+    if (shouldEscalate && canUseAi && navigator.onLine) {
       void askAI(q, true);
-    }
-  };
-
-  const askAI = async (q: string, auto = false) => {
-    if (!kundli || aiBusy) return;
-    setAiBusy(true);
-    try {
-      const res = await fetch("/api/ask-ai", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          question: q,
-          lang,
-          kundli: buildKundliSummary(kundli),
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setItems((prev) => [
-          ...prev,
-          { question: q, answer: data.answer, source: "ai", provider: data.provider },
-        ]);
-        void saveRecord({
-          profileId,
-          question: q,
-          answer: data.answer,
-          source: "ai",
-          createdAt: Date.now(),
-        });
-      } else if (!auto) {
-        setItems((prev) => [
-          ...prev,
-          { question: q, answer: t("aiUnavailable"), source: "engine" },
-        ]);
-      }
-    } catch {
-      if (!auto) {
-        setItems((prev) => [
-          ...prev,
-          { question: q, answer: t("aiUnavailable"), source: "engine" },
-        ]);
-      }
-    } finally {
-      setAiBusy(false);
     }
   };
 
@@ -164,14 +177,35 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
     <ProfileTheme birthdayNumber={kundli.numerology.birthdayNumber}>
       <AppShell>
         <div className="mx-auto max-w-3xl">
-          <h1 className="mb-1 text-xl font-semibold text-(--color-gold-soft)">
-            {t("askQuestion")} — {profile.name}
-          </h1>
+          <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+            <h1 className="text-xl font-semibold text-(--color-gold-soft)">
+              {t("askQuestion")} — {profile.name}
+            </h1>
+            {/* AI usage meter — always visible so costs never surprise */}
+            {cfg && usage && cfg.mode !== "never" && (
+              <Link
+                href="/settings"
+                className={`rounded-full border px-3 py-1 text-xs ${
+                  limitReached
+                    ? "border-red-500/50 text-red-300"
+                    : "border-(--color-line) text-(--color-ink-soft)"
+                }`}
+                title={t("aiUsageToday")}
+              >
+                ✨ {usage.callsToday}/{cfg.dailyLimit} {t("calls")} · {fmtCost(usage.costTodayUsd)}
+              </Link>
+            )}
+          </div>
           <p className="mb-5 text-xs text-(--color-ink-soft)">
-            {aiAvailable === false
-              ? `✓ ${t("generatedOffline")}`
-              : `✓ ${t("generatedOffline")} · AI: ${aiAvailable ? "✓" : "…"}`}
+            ✓ {t("generatedOffline")}
+            {cfg && cfg.mode !== "never" && (canUseAi ? " · AI ✓" : ` · ${t("aiNotConfigured")}`)}
           </p>
+
+          {notice && (
+            <p className="mb-4 rounded-md border border-orange-500/40 bg-orange-500/10 p-3 text-sm text-orange-300">
+              {notice}
+            </p>
+          )}
 
           {/* Chat area */}
           <div className="space-y-4">
@@ -204,7 +238,7 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
                 </div>
                 <div className="flex justify-start">
                   <div className="card max-w-[90%] rounded-xl rounded-bl-sm px-4 py-3">
-                    <div className="mb-1.5 flex items-center gap-2 text-xs">
+                    <div className="mb-1.5 flex flex-wrap items-center gap-2 text-xs">
                       <span
                         className={`rounded-full border px-2 py-0.5 ${
                           item.source === "ai"
@@ -221,9 +255,14 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
                           {t("confidence")}: {item.confidence}%
                         </span>
                       )}
+                      {item.source === "ai" && item.costUsd !== undefined && (
+                        <span className="text-(--color-ink-soft)">
+                          {item.costUsd === 0 ? t("free") : fmtCost(item.costUsd)}
+                        </span>
+                      )}
                     </div>
                     <p className="whitespace-pre-wrap text-sm leading-relaxed">{item.answer}</p>
-                    {item.lowConfidence && aiAvailable && (
+                    {item.lowConfidence && canUseAi && cfg?.mode === "fallback" && (
                       <p className="mt-2 text-xs text-(--color-ink-soft)">{t("lowConfidenceNote")}</p>
                     )}
                   </div>
@@ -256,13 +295,13 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
             >
               {t("ask")}
             </button>
-            {aiAvailable && lastQuestion && (
+            {canUseAi && lastQuestion && (
               <button
                 type="button"
-                disabled={aiBusy}
+                disabled={aiBusy || limitReached}
                 onClick={() => askAI(lastQuestion)}
                 className="rounded-xl border border-violet-500/40 px-4 py-3 text-sm text-violet-300 transition hover:bg-violet-500/10 disabled:opacity-50"
-                title={t("askAI")}
+                title={limitReached ? t("aiLimitReached") : t("askAI")}
               >
                 ✨ {t("askAI")}
               </button>
