@@ -10,7 +10,7 @@ export function YogaList({ kundli }: { kundli: Kundli }) {
   const doshas = kundli.yogas.filter((y) => y.kind === "dosha");
 
   if (kundli.yogas.length === 0) {
-    return <p className="text-sm text-[--color-ink-soft]">{t("noYogas")}</p>;
+    return <p className="text-sm text-(--color-ink-soft)">{t("noYogas")}</p>;
   }
 
   const strengthLabel = (s: number) =>
@@ -21,7 +21,7 @@ export function YogaList({ kundli }: { kundli: Kundli }) {
     return (
       <div className="card p-4">
         <div className="flex items-start justify-between gap-2">
-          <h4 className="font-medium text-[--color-gold-soft]">
+          <h4 className="font-medium text-(--color-gold-soft)">
             {kb ? (lang === "hi" ? kb.name.hi : kb.name.en) : y.key}
           </h4>
           <span
@@ -34,7 +34,7 @@ export function YogaList({ kundli }: { kundli: Kundli }) {
             {strengthLabel(y.strength)}
           </span>
         </div>
-        <p className="mt-1 text-xs text-[--color-ink-soft]">{y.detail}</p>
+        <p className="mt-1 text-xs text-(--color-ink-soft)">{y.detail}</p>
         {kb && (
           <p className="mt-2 text-sm leading-relaxed">
             {lang === "hi" ? kb.meaning.hi : kb.meaning.en}

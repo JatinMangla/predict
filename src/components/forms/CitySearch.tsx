@@ -85,16 +85,16 @@ export function CitySearch({
         }}
         onFocus={() => setOpen(true)}
         placeholder={t("searchCity")}
-        className="w-full rounded-lg border border-[--color-line] bg-[--color-surface] px-3 py-2.5 text-[--color-ink] outline-none focus:border-[--accent]"
+        className="w-full rounded-lg border border-(--color-line) bg-(--color-surface) px-3 py-2.5 text-(--color-ink) outline-none focus:border-(--accent)"
         autoComplete="off"
       />
       {open && results.length > 0 && (
-        <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-[--color-line] bg-[--color-surface-2] shadow-xl">
+        <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-(--color-line) bg-(--color-surface-2) shadow-xl">
           {results.map((c, i) => (
             <li key={i}>
               <button
                 type="button"
-                className="w-full px-3 py-2 text-left text-sm hover:bg-[--color-surface-3]"
+                className="w-full px-3 py-2 text-left text-sm hover:bg-(--color-surface-3)"
                 onClick={() => {
                   const label = `${c[0]}${c[1] ? ", " + c[1] : ""}, ${c[2]}`;
                   setQuery(label);
@@ -107,8 +107,8 @@ export function CitySearch({
                   });
                 }}
               >
-                <span className="text-[--color-ink]">{c[0]}</span>
-                <span className="text-[--color-ink-soft]">
+                <span className="text-(--color-ink)">{c[0]}</span>
+                <span className="text-(--color-ink-soft)">
                   {c[1] ? `, ${c[1]}` : ""} · {c[2]}
                 </span>
               </button>

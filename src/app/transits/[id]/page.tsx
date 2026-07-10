@@ -31,7 +31,7 @@ export default function TransitsPage({ params }: { params: Promise<{ id: string 
   const positions = useMemo(() => currentPositions(now), [now]);
   const events = useMemo(() => findTransitEvents(now, now + 365 * DAY_MS), [now]);
 
-  if (loading) return <AppShell><p className="p-8 text-center text-[--color-ink-soft]">{t("loading")}</p></AppShell>;
+  if (loading) return <AppShell><p className="p-8 text-center text-(--color-ink-soft)">{t("loading")}</p></AppShell>;
   if (error || !kundli || !profile) {
     return (
       <AppShell>
@@ -56,27 +56,27 @@ export default function TransitsPage({ params }: { params: Promise<{ id: string 
   return (
     <ProfileTheme birthdayNumber={kundli.numerology.birthdayNumber}>
       <AppShell>
-        <h1 className="mb-5 text-xl font-semibold text-[--color-gold-soft]">
+        <h1 className="mb-5 text-xl font-semibold text-(--color-gold-soft)">
           {t("transits")} — {profile.name}
         </h1>
 
         {/* Sade Sati banner */}
         <div
           className={`card mb-5 border-l-4 p-4 ${
-            phase === "none" ? "border-[--color-line]" : phase === "peak" ? "border-red-500/50" : "border-orange-500/40"
+            phase === "none" ? "border-(--color-line)" : phase === "peak" ? "border-red-500/50" : "border-orange-500/40"
           }`}
         >
-          <span className="text-sm font-medium text-[--color-gold-soft]">{t("sadeSati")}: </span>
+          <span className="text-sm font-medium text-(--color-gold-soft)">{t("sadeSati")}: </span>
           <span className="text-sm">{phaseText}</span>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Current sky, personalised */}
           <section>
-            <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-[--color-ink-soft]">
+            <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-(--color-ink-soft)">
               {t("currentSky")} · {t("personalEffects")}
             </h2>
-            <div className="card divide-y divide-[--color-line]/50">
+            <div className="card divide-y divide-(--color-line)/50">
               {positions.map((p) => {
                 const h = houseFromMoon(moonSign, p.sign);
                 const good = FAVOURABLE_FROM_MOON[p.id].includes(h);
@@ -85,11 +85,11 @@ export default function TransitsPage({ params }: { params: Promise<{ id: string 
                   <div key={p.id} className="flex items-center justify-between gap-3 px-4 py-3">
                     <div>
                       <span className="font-medium">{planetName(p.id, lang)}</span>{" "}
-                      <span className="text-sm text-[--color-ink-soft]">
+                      <span className="text-sm text-(--color-ink-soft)">
                         {signName(p.sign, lang)} {fmtDegInSign(p.degInSign)}
                         {p.retrograde && p.id !== "Rahu" && p.id !== "Ketu" ? ` · ${t("retrograde")}` : ""}
                       </span>
-                      <p className="mt-0.5 text-xs text-[--color-ink-soft]">
+                      <p className="mt-0.5 text-xs text-(--color-ink-soft)">
                         {h} {t("fromYourMoon")} — {lang === "hi" ? tone.hi : tone.en}
                       </p>
                     </div>
@@ -110,10 +110,10 @@ export default function TransitsPage({ params }: { params: Promise<{ id: string 
 
           {/* Upcoming movements */}
           <section>
-            <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-[--color-ink-soft]">
+            <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-(--color-ink-soft)">
               {t("upcomingMovements")}
             </h2>
-            <div className="card divide-y divide-[--color-line]/50">
+            <div className="card divide-y divide-(--color-line)/50">
               {events.slice(0, 24).map((ev, i) => {
                 const name = planetName(ev.planet, lang);
                 if (ev.type === "ingress" && ev.toSign !== undefined) {
@@ -124,12 +124,12 @@ export default function TransitsPage({ params }: { params: Promise<{ id: string 
                       <div>
                         <span className="font-medium">{name}</span>{" "}
                         {t("entersSign")} <span className="accent-text">{signName(ev.toSign, lang)}</span>
-                        <p className="text-xs text-[--color-ink-soft]">
+                        <p className="text-xs text-(--color-ink-soft)">
                           {h} {t("fromYourMoon")} · {HOUSE_DOMAINS[h - 1][lang === "hi" ? "hi" : "en"]}
                         </p>
                       </div>
                       <div className="shrink-0 text-right">
-                        <div className="text-xs text-[--color-ink-soft]">{fmtDate(ev.timeMs, lang)}</div>
+                        <div className="text-xs text-(--color-ink-soft)">{fmtDate(ev.timeMs, lang)}</div>
                         <span className={`text-xs ${good ? "text-emerald-300" : "text-orange-300"}`}>
                           {good ? t("favourable") : t("unfavourable")}
                         </span>
@@ -143,7 +143,7 @@ export default function TransitsPage({ params }: { params: Promise<{ id: string 
                       <span className="font-medium">{name}</span>{" "}
                       {ev.type === "retrograde" ? t("goesRetrograde") : t("goesDirect")}
                     </span>
-                    <span className="text-xs text-[--color-ink-soft]">{fmtDate(ev.timeMs, lang)}</span>
+                    <span className="text-xs text-(--color-ink-soft)">{fmtDate(ev.timeMs, lang)}</span>
                   </div>
                 );
               })}

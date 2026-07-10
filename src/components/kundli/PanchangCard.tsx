@@ -38,12 +38,12 @@ export function PanchangCard({
   return (
     <div className="card p-5">
       {title && (
-        <h3 className="mb-3 text-sm font-medium text-[--color-gold-soft]">{title}</h3>
+        <h3 className="mb-3 text-sm font-medium text-(--color-gold-soft)">{title}</h3>
       )}
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
         {rows.map(([k, v]) => (
           <div key={k} className="contents">
-            <dt className="text-[--color-ink-soft]">{k}</dt>
+            <dt className="text-(--color-ink-soft)">{k}</dt>
             <dd>{v}</dd>
           </div>
         ))}

@@ -31,7 +31,7 @@ export default function PredictionsPage({ params }: { params: Promise<{ id: stri
     return yearlyPrediction(kundli);
   }, [kundli, period]);
 
-  if (loading) return <AppShell><p className="p-8 text-center text-[--color-ink-soft]">{t("loading")}</p></AppShell>;
+  if (loading) return <AppShell><p className="p-8 text-center text-(--color-ink-soft)">{t("loading")}</p></AppShell>;
   if (error || !kundli || !profile || !prediction) {
     return (
       <AppShell>
@@ -46,7 +46,7 @@ export default function PredictionsPage({ params }: { params: Promise<{ id: stri
   const pick = (b: { en: string; hi: string }) => (lang === "hi" ? b.hi : b.en);
   const toneCls = {
     good: "border-emerald-500/30",
-    mixed: "border-[--color-line]",
+    mixed: "border-(--color-line)",
     caution: "border-orange-500/40",
   };
 
@@ -62,20 +62,20 @@ export default function PredictionsPage({ params }: { params: Promise<{ id: stri
       <AppShell>
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl font-semibold text-[--color-gold-soft]">
+            <h1 className="text-xl font-semibold text-(--color-gold-soft)">
               {t("predictionFor")} {profile.name}
             </h1>
-            <p className="text-xs text-[--color-ink-soft]">
+            <p className="text-xs text-(--color-ink-soft)">
               {fmtDate(prediction.rangeStart, lang)} — {fmtDate(prediction.rangeEnd, lang)} · ✓ {t("generatedOffline")}
             </p>
           </div>
-          <div className="flex gap-1 rounded-lg border border-[--color-line] p-1 text-sm">
+          <div className="flex gap-1 rounded-lg border border-(--color-line) p-1 text-sm">
             {(["weekly", "monthly", "yearly"] as const).map((p) => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
                 className={`rounded-md px-4 py-1.5 transition ${
-                  period === p ? "accent-bg accent-text font-medium" : "text-[--color-ink-soft]"
+                  period === p ? "accent-bg accent-text font-medium" : "text-(--color-ink-soft)"
                 }`}
               >
                 {t(p)}
@@ -93,10 +93,10 @@ export default function PredictionsPage({ params }: { params: Promise<{ id: stri
           {areaEntries.map(([label, score]) => (
             <div key={label} className="card p-4">
               <div className="flex items-baseline justify-between">
-                <span className="text-sm text-[--color-ink-soft]">{label}</span>
+                <span className="text-sm text-(--color-ink-soft)">{label}</span>
                 <span className="text-lg font-semibold accent-text">{score}</span>
               </div>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[--color-surface]">
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-(--color-surface)">
                 <div
                   className="h-full rounded-full"
                   style={{
@@ -129,7 +129,7 @@ export default function PredictionsPage({ params }: { params: Promise<{ id: stri
         <div className="space-y-3">
           {prediction.sections.map((s, i) => (
             <div key={i} className={`card border-l-4 p-5 ${toneCls[s.tone]}`}>
-              <h3 className="mb-1 text-sm font-medium text-[--color-gold-soft]">{pick(s.title)}</h3>
+              <h3 className="mb-1 text-sm font-medium text-(--color-gold-soft)">{pick(s.title)}</h3>
               <p className="text-sm leading-relaxed">{pick(s.body)}</p>
             </div>
           ))}

@@ -13,13 +13,13 @@ export default async function LoginPage({
   return (
     <main className="flex min-h-screen items-center justify-center p-6">
       <div className="card w-full max-w-md p-8 text-center">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-[--color-gold] text-3xl">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-(--color-gold) text-3xl">
           ॐ
         </div>
-        <h1 className="text-2xl font-semibold tracking-wide text-[--color-gold-soft]">
+        <h1 className="text-2xl font-semibold tracking-wide text-(--color-gold-soft)">
           Kundli Predict
         </h1>
-        <p className="mt-2 text-sm text-[--color-ink-soft]">
+        <p className="mt-2 text-sm text-(--color-ink-soft)">
           Vedic astrology · Kundli · Dashas · Predictions · Numerology
           <br />
           <span className="text-xs">कुंडली · दशा · भविष्यफल · अंक ज्योतिष</span>
@@ -42,13 +42,13 @@ export default async function LoginPage({
         >
           <button
             type="submit"
-            className="w-full rounded-lg bg-[--color-gold] px-4 py-3 font-medium text-[#1a1405] transition hover:brightness-110"
+            className="w-full rounded-lg bg-(--color-gold) px-4 py-3 font-medium text-[#1a1405] transition hover:brightness-110"
           >
             Sign in with Google
           </button>
         </form>
 
-        <p className="mt-4 text-xs text-[--color-ink-soft]">
+        <p className="mt-4 text-xs text-(--color-ink-soft)">
           Only the owner&apos;s Google account can sign in. All kundli data
           stays on your device.
         </p>

@@ -146,7 +146,7 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
     askEngine(q);
   };
 
-  if (loading) return <AppShell><p className="p-8 text-center text-[--color-ink-soft]">{t("loading")}</p></AppShell>;
+  if (loading) return <AppShell><p className="p-8 text-center text-(--color-ink-soft)">{t("loading")}</p></AppShell>;
   if (error || !kundli || !profile) {
     return (
       <AppShell>
@@ -164,10 +164,10 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
     <ProfileTheme birthdayNumber={kundli.numerology.birthdayNumber}>
       <AppShell>
         <div className="mx-auto max-w-3xl">
-          <h1 className="mb-1 text-xl font-semibold text-[--color-gold-soft]">
+          <h1 className="mb-1 text-xl font-semibold text-(--color-gold-soft)">
             {t("askQuestion")} — {profile.name}
           </h1>
-          <p className="mb-5 text-xs text-[--color-ink-soft]">
+          <p className="mb-5 text-xs text-(--color-ink-soft)">
             {aiAvailable === false
               ? `✓ ${t("generatedOffline")}`
               : `✓ ${t("generatedOffline")} · AI: ${aiAvailable ? "✓" : "…"}`}
@@ -177,14 +177,14 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
           <div className="space-y-4">
             {items.length === 0 && history && history.length > 0 && (
               <div className="card p-4">
-                <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-[--color-ink-soft]">
+                <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-(--color-ink-soft)">
                   {t("history")}
                 </h3>
-                <ul className="space-y-1 text-sm text-[--color-ink-soft]">
+                <ul className="space-y-1 text-sm text-(--color-ink-soft)">
                   {history.map((h) => (
                     <li key={h.id}>
                       <button
-                        className="text-left hover:text-[--color-ink]"
+                        className="text-left hover:text-(--color-ink)"
                         onClick={() => setQuestion(h.question)}
                       >
                         • {h.question}
@@ -217,14 +217,14 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
                           : t("engineAnswer")}
                       </span>
                       {item.confidence !== undefined && (
-                        <span className="text-[--color-ink-soft]">
+                        <span className="text-(--color-ink-soft)">
                           {t("confidence")}: {item.confidence}%
                         </span>
                       )}
                     </div>
                     <p className="whitespace-pre-wrap text-sm leading-relaxed">{item.answer}</p>
                     {item.lowConfidence && aiAvailable && (
-                      <p className="mt-2 text-xs text-[--color-ink-soft]">{t("lowConfidenceNote")}</p>
+                      <p className="mt-2 text-xs text-(--color-ink-soft)">{t("lowConfidenceNote")}</p>
                     )}
                   </div>
                 </div>
@@ -233,7 +233,7 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
 
             {aiBusy && (
               <div className="flex justify-start">
-                <div className="card rounded-xl px-4 py-3 text-sm text-[--color-ink-soft]">
+                <div className="card rounded-xl px-4 py-3 text-sm text-(--color-ink-soft)">
                   ✨ {t("aiThinking")}
                 </div>
               </div>
@@ -248,11 +248,11 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
               onChange={(e) => setQuestion(e.target.value)}
               placeholder={t("askPlaceholder")}
               maxLength={600}
-              className="flex-1 rounded-xl border border-[--color-line] bg-[--color-surface-2] px-4 py-3 text-sm outline-none focus:border-[--accent]"
+              className="flex-1 rounded-xl border border-(--color-line) bg-(--color-surface-2) px-4 py-3 text-sm outline-none focus:border-(--accent)"
             />
             <button
               type="submit"
-              className="rounded-xl bg-[--accent] px-5 py-3 text-sm font-medium text-[#14100a] transition hover:brightness-110"
+              className="rounded-xl bg-(--accent) px-5 py-3 text-sm font-medium text-[#14100a] transition hover:brightness-110"
             >
               {t("ask")}
             </button>

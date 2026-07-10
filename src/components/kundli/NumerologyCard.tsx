@@ -22,7 +22,7 @@ export function NumerologyCard({ numerology }: { numerology: NumerologyResult })
         >
           {value}
         </span>
-        <span className="mt-2 text-center text-xs text-[--color-ink-soft]">{label}</span>
+        <span className="mt-2 text-center text-xs text-(--color-ink-soft)">{label}</span>
       </div>
     );
 
@@ -39,11 +39,11 @@ export function NumerologyCard({ numerology }: { numerology: NumerologyResult })
 
       {bd && (
         <div className="card p-5">
-          <h3 className="mb-1 text-sm font-medium text-[--color-gold-soft]">
+          <h3 className="mb-1 text-sm font-medium text-(--color-gold-soft)">
             {t("birthdayNumber")} {numerology.birthdayNumber} · {t("rulingPlanet")}: {pick(bd.planet)}
           </h3>
           <p className="text-sm leading-relaxed">{pick(bd.traits)}</p>
-          <div className="mt-3 grid gap-2 text-xs text-[--color-ink-soft] sm:grid-cols-2">
+          <div className="mt-3 grid gap-2 text-xs text-(--color-ink-soft) sm:grid-cols-2">
             <p>
               <span className="accent-text">{t("luckyColors")}:</span> {pick(bd.luckyColors)}
             </p>
@@ -56,7 +56,7 @@ export function NumerologyCard({ numerology }: { numerology: NumerologyResult })
 
       {lp && numerology.lifePathNumber !== numerology.birthdayNumber && (
         <div className="card p-5">
-          <h3 className="mb-1 text-sm font-medium text-[--color-gold-soft]">
+          <h3 className="mb-1 text-sm font-medium text-(--color-gold-soft)">
             {t("lifePathNumber")} {numerology.lifePathNumber} · {t("rulingPlanet")}: {pick(lp.planet)}
           </h3>
           <p className="text-sm leading-relaxed">{pick(lp.traits)}</p>

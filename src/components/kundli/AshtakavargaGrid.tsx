@@ -14,14 +14,14 @@ export function AshtakavargaGrid({ kundli }: { kundli: Kundli }) {
     const lo = isSav ? 25 : 3;
     if (v >= hi) return "text-emerald-300 font-semibold";
     if (v < lo) return "text-red-300";
-    return "text-[--color-ink]";
+    return "text-(--color-ink)";
   };
 
   return (
     <div className="card overflow-x-auto">
       <table className="w-full min-w-[720px] text-center text-sm">
         <thead>
-          <tr className="border-b border-[--color-line] text-[--color-ink-soft]">
+          <tr className="border-b border-(--color-line) text-(--color-ink-soft)">
             <th className="px-3 py-2 text-left"> </th>
             {Array.from({ length: 12 }, (_, s) => (
               <th key={s} className="px-2 py-2 font-normal">
@@ -32,7 +32,7 @@ export function AshtakavargaGrid({ kundli }: { kundli: Kundli }) {
         </thead>
         <tbody>
           {SAPTA_GRAHAS.map((p) => (
-            <tr key={p} className="border-b border-[--color-line]/40">
+            <tr key={p} className="border-b border-(--color-line)/40">
               <td className="px-3 py-2 text-left font-medium">{planetName(p, lang)}</td>
               {bav[p].map((v, s) => (
                 <td key={s} className={`px-2 py-2 ${cellColor(v, false)}`}>
@@ -51,7 +51,7 @@ export function AshtakavargaGrid({ kundli }: { kundli: Kundli }) {
           </tr>
         </tbody>
       </table>
-      <p className="px-4 py-3 text-xs text-[--color-ink-soft]">
+      <p className="px-4 py-3 text-xs text-(--color-ink-soft)">
         {lang === "hi"
           ? "28+ बिंदु वाली राशियाँ गोचर में शुभ फल देती हैं; 25 से कम वाली राशियों में गोचर कष्टकारी रहता है।"
           : "Signs with 28+ bindus give good transit results; transits through signs under 25 bindus are testing."}

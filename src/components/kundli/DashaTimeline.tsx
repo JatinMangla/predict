@@ -18,23 +18,23 @@ export function DashaTimeline({ kundli }: { kundli: Kundli }) {
   return (
     <div className="space-y-4">
       <div className="card p-5">
-        <h3 className="mb-2 text-sm font-medium text-[--color-ink-soft]">{t("currentDasha")}</h3>
+        <h3 className="mb-2 text-sm font-medium text-(--color-ink-soft)">{t("currentDasha")}</h3>
         <div className="flex flex-wrap gap-2">
           {chain.map((p, i) => (
             <span key={i} className="accent-bg rounded-lg px-3 py-1.5 text-sm">
               <span className="font-semibold">{planetName(p.lord, lang)}</span>{" "}
-              <span className="text-xs text-[--color-ink-soft]">
+              <span className="text-xs text-(--color-ink-soft)">
                 {[t("mahadasha"), t("antardasha"), t("pratyantardasha")][i]}
               </span>
             </span>
           ))}
         </div>
-        <p className="mt-3 text-sm leading-relaxed text-[--color-ink]">
+        <p className="mt-3 text-sm leading-relaxed text-(--color-ink)">
           {lang === "hi" ? reading.hi : reading.en}
         </p>
       </div>
 
-      <div className="card divide-y divide-[--color-line]/50">
+      <div className="card divide-y divide-(--color-line)/50">
         {kundli.dasha.map((md, i) => (
           <MdRow key={i} md={md} now={now} birthMs={kundli.utcMs} />
         ))}
@@ -53,7 +53,7 @@ function MdRow({ md, now, birthMs }: { md: DashaPeriod; now: number; birthMs: nu
     <div>
       <button
         onClick={() => setOpen(!open)}
-        className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm transition hover:bg-[--color-surface-3] ${
+        className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm transition hover:bg-(--color-surface-3) ${
           active ? "accent-bg" : ""
         }`}
       >
@@ -61,12 +61,12 @@ function MdRow({ md, now, birthMs }: { md: DashaPeriod; now: number; birthMs: nu
           {planetName(md.lord, lang)} {t("mahadasha")}
           {active && <span className="accent-text ml-2 text-xs">●</span>}
         </span>
-        <span className="text-xs text-[--color-ink-soft]">
+        <span className="text-xs text-(--color-ink-soft)">
           {fmtDate(Math.max(md.start, birthMs), lang)} — {fmtDate(md.end, lang)}
         </span>
       </button>
       {open && md.children && (
-        <div className="bg-[--color-surface] px-4 py-2">
+        <div className="bg-(--color-surface) px-4 py-2">
           {md.children
             .filter((ad) => ad.end >= birthMs)
             .map((ad, j) => (
@@ -83,11 +83,11 @@ function AdRow({ ad, now, birthMs }: { ad: DashaPeriod; now: number; birthMs: nu
   const [open, setOpen] = useState(false);
   const active = now >= ad.start && now < ad.end;
   return (
-    <div className="border-l border-[--color-line] pl-3">
+    <div className="border-l border-(--color-line) pl-3">
       <button
         onClick={() => setOpen(!open)}
-        className={`flex w-full items-center justify-between py-1.5 text-left text-xs transition hover:text-[--color-gold-soft] ${
-          active ? "accent-text font-semibold" : "text-[--color-ink-soft]"
+        className={`flex w-full items-center justify-between py-1.5 text-left text-xs transition hover:text-(--color-gold-soft) ${
+          active ? "accent-text font-semibold" : "text-(--color-ink-soft)"
         }`}
       >
         <span>
@@ -107,7 +107,7 @@ function AdRow({ ad, now, birthMs }: { ad: DashaPeriod; now: number; birthMs: nu
                 <div
                   key={k}
                   className={`flex justify-between py-0.5 text-[11px] ${
-                    pdActive ? "accent-text" : "text-[--color-ink-soft]/70"
+                    pdActive ? "accent-text" : "text-(--color-ink-soft)/70"
                   }`}
                 >
                   <span>{planetName(pd.lord, lang)}</span>

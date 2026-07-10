@@ -47,7 +47,7 @@ export default function KundliPage({ params }: { params: Promise<{ id: string }>
     void setSetting("chartStyle", s);
   };
 
-  if (loading) return <AppShell><p className="p-8 text-center text-[--color-ink-soft]">{t("loading")}</p></AppShell>;
+  if (loading) return <AppShell><p className="p-8 text-center text-(--color-ink-soft)">{t("loading")}</p></AppShell>;
   if (error || !kundli || !profile) {
     return (
       <AppShell>
@@ -80,16 +80,16 @@ export default function KundliPage({ params }: { params: Promise<{ id: string }>
         <div className="card mb-5 p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h1 className="text-xl font-semibold text-[--color-gold-soft]">{profile.name}</h1>
-              <p className="mt-0.5 text-xs text-[--color-ink-soft]">
+              <h1 className="text-xl font-semibold text-(--color-gold-soft)">{profile.name}</h1>
+              <p className="mt-0.5 text-xs text-(--color-ink-soft)">
                 {t("born")} {profile.localDateTime.replace("T", " · ")} · {profile.place}
               </p>
             </div>
             <div className="flex flex-wrap gap-4 text-sm">
-              <span><span className="text-[--color-ink-soft]">{t("ascendant")}:</span> {signName(kundli.lagna.sign, lang)} {fmtDegInSign(kundli.lagna.degInSign)}</span>
-              <span><span className="text-[--color-ink-soft]">{t("moonSign")}:</span> {signName(moon.sign, lang)}</span>
-              <span><span className="text-[--color-ink-soft]">{t("sunSign")}:</span> {signName(sun.sign, lang)}</span>
-              <span><span className="text-[--color-ink-soft]">{t("birthNakshatra")}:</span> {nakshatraName(moon.nakshatra, lang)} ({moon.pada})</span>
+              <span><span className="text-(--color-ink-soft)">{t("ascendant")}:</span> {signName(kundli.lagna.sign, lang)} {fmtDegInSign(kundli.lagna.degInSign)}</span>
+              <span><span className="text-(--color-ink-soft)">{t("moonSign")}:</span> {signName(moon.sign, lang)}</span>
+              <span><span className="text-(--color-ink-soft)">{t("sunSign")}:</span> {signName(sun.sign, lang)}</span>
+              <span><span className="text-(--color-ink-soft)">{t("birthNakshatra")}:</span> {nakshatraName(moon.nakshatra, lang)} ({moon.pada})</span>
             </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
@@ -100,15 +100,15 @@ export default function KundliPage({ params }: { params: Promise<{ id: string }>
         </div>
 
         {/* Tabs */}
-        <div className="mb-5 flex flex-wrap gap-1 border-b border-[--color-line]">
+        <div className="mb-5 flex flex-wrap gap-1 border-b border-(--color-line)">
           {tabs.map((x) => (
             <button
               key={x.key}
               onClick={() => setTab(x.key)}
               className={`rounded-t-md px-4 py-2 text-sm transition ${
                 tab === x.key
-                  ? "accent-bg accent-text border-b-2 border-[--accent] font-medium"
-                  : "text-[--color-ink-soft] hover:text-[--color-ink]"
+                  ? "accent-bg accent-text border-b-2 border-(--accent) font-medium"
+                  : "text-(--color-ink-soft) hover:text-(--color-ink)"
               }`}
             >
               {x.label}
@@ -125,8 +125,8 @@ export default function KundliPage({ params }: { params: Promise<{ id: string }>
                   onClick={() => switchStyle(s)}
                   className={`rounded-md border px-3 py-1.5 transition ${
                     style === s
-                      ? "accent-bg border-[--accent]"
-                      : "border-[--color-line] text-[--color-ink-soft]"
+                      ? "accent-bg border-(--accent)"
+                      : "border-(--color-line) text-(--color-ink-soft)"
                   }`}
                 >
                   {s === "north" ? t("northIndian") : t("southIndian")}

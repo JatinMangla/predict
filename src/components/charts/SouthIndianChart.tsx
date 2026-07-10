@@ -45,7 +45,7 @@ export function SouthIndianChart({
   return (
     <div className="card p-4">
       {title && (
-        <div className="mb-2 text-center text-sm font-medium text-[--color-gold-soft]">
+        <div className="mb-2 text-center text-sm font-medium text-(--color-gold-soft)">
           {title}
         </div>
       )}

@@ -77,19 +77,19 @@ export function BirthDetailsForm({ existing }: { existing?: StoredProfile }) {
   };
 
   const inputCls =
-    "w-full rounded-lg border border-[--color-line] bg-[--color-surface] px-3 py-2.5 text-[--color-ink] outline-none focus:border-[--accent]";
+    "w-full rounded-lg border border-(--color-line) bg-(--color-surface) px-3 py-2.5 text-(--color-ink) outline-none focus:border-(--accent)";
 
   return (
     <form onSubmit={submit} className="card mx-auto max-w-xl space-y-5 p-6">
-      <h1 className="text-xl font-semibold text-[--color-gold-soft]">{t("birthDetails")}</h1>
+      <h1 className="text-xl font-semibold text-(--color-gold-soft)">{t("birthDetails")}</h1>
 
       <div>
-        <label className="mb-1 block text-sm text-[--color-ink-soft]">{t("fullName")}</label>
+        <label className="mb-1 block text-sm text-(--color-ink-soft)">{t("fullName")}</label>
         <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
       </div>
 
       <div>
-        <label className="mb-1 block text-sm text-[--color-ink-soft]">{t("gender")}</label>
+        <label className="mb-1 block text-sm text-(--color-ink-soft)">{t("gender")}</label>
         <div className="flex gap-2">
           {(["male", "female", "other"] as const).map((g) => (
             <button
@@ -98,8 +98,8 @@ export function BirthDetailsForm({ existing }: { existing?: StoredProfile }) {
               onClick={() => setGender(g)}
               className={`rounded-lg border px-4 py-2 text-sm transition ${
                 gender === g
-                  ? "accent-bg border-[--accent] text-[--color-ink]"
-                  : "border-[--color-line] text-[--color-ink-soft]"
+                  ? "accent-bg border-(--accent) text-(--color-ink)"
+                  : "border-(--color-line) text-(--color-ink-soft)"
               }`}
             >
               {t(g)}
@@ -110,23 +110,23 @@ export function BirthDetailsForm({ existing }: { existing?: StoredProfile }) {
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="mb-1 block text-sm text-[--color-ink-soft]">{t("birthDate")}</label>
+          <label className="mb-1 block text-sm text-(--color-ink-soft)">{t("birthDate")}</label>
           <input type="date" className={inputCls} value={date} min="1900-01-01" max="2099-12-31" onChange={(e) => setDate(e.target.value)} />
         </div>
         <div>
-          <label className="mb-1 block text-sm text-[--color-ink-soft]">{t("birthTime")}</label>
+          <label className="mb-1 block text-sm text-(--color-ink-soft)">{t("birthTime")}</label>
           <input type="time" className={inputCls} value={time} onChange={(e) => setTime(e.target.value)} />
         </div>
       </div>
-      <p className="text-xs text-[--color-ink-soft]">{t("timeAccuracyNote")}</p>
+      <p className="text-xs text-(--color-ink-soft)">{t("timeAccuracyNote")}</p>
 
       <div>
-        <label className="mb-1 block text-sm text-[--color-ink-soft]">{t("birthPlace")}</label>
+        <label className="mb-1 block text-sm text-(--color-ink-soft)">{t("birthPlace")}</label>
         <CitySearch value={place} onPick={onPick} />
         <button
           type="button"
           onClick={() => setManual(!manual)}
-          className="mt-2 text-xs text-[--color-ink-soft] underline"
+          className="mt-2 text-xs text-(--color-ink-soft) underline"
         >
           {t("manualCoords")}
         </button>
@@ -135,15 +135,15 @@ export function BirthDetailsForm({ existing }: { existing?: StoredProfile }) {
       {manual && (
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <label className="mb-1 block text-xs text-[--color-ink-soft]">{t("latitude")}</label>
+            <label className="mb-1 block text-xs text-(--color-ink-soft)">{t("latitude")}</label>
             <input className={inputCls} value={lat} onChange={(e) => setLat(e.target.value)} placeholder="28.61" />
           </div>
           <div>
-            <label className="mb-1 block text-xs text-[--color-ink-soft]">{t("longitude")}</label>
+            <label className="mb-1 block text-xs text-(--color-ink-soft)">{t("longitude")}</label>
             <input className={inputCls} value={lon} onChange={(e) => setLon(e.target.value)} placeholder="77.21" />
           </div>
           <div>
-            <label className="mb-1 block text-xs text-[--color-ink-soft]">{t("timezone")}</label>
+            <label className="mb-1 block text-xs text-(--color-ink-soft)">{t("timezone")}</label>
             <select className={inputCls} value={tz} onChange={(e) => setTz(e.target.value)}>
               {TIMEZONES.map((z) => (
                 <option key={z} value={z}>{z}</option>
@@ -154,7 +154,7 @@ export function BirthDetailsForm({ existing }: { existing?: StoredProfile }) {
       )}
 
       {lat && lon && !manual && (
-        <p className="text-xs text-[--color-ink-soft]">
+        <p className="text-xs text-(--color-ink-soft)">
           {place} · {Number(lat).toFixed(2)}°, {Number(lon).toFixed(2)}° · {tz}
         </p>
       )}
@@ -166,7 +166,7 @@ export function BirthDetailsForm({ existing }: { existing?: StoredProfile }) {
       <button
         type="submit"
         disabled={busy}
-        className="w-full rounded-lg bg-[--accent] px-4 py-3 font-medium text-[#14100a] transition hover:brightness-110 disabled:opacity-50"
+        className="w-full rounded-lg bg-(--accent) px-4 py-3 font-medium text-[#14100a] transition hover:brightness-110 disabled:opacity-50"
       >
         {busy ? t("loading") : t("save")}
       </button>

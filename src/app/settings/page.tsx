@@ -63,7 +63,7 @@ export default function SettingsPage() {
   return (
     <AppShell>
       <div className="mx-auto max-w-2xl space-y-4">
-        <h1 className="text-xl font-semibold text-[--color-gold-soft]">{t("settings")}</h1>
+        <h1 className="text-xl font-semibold text-(--color-gold-soft)">{t("settings")}</h1>
 
         <div className={row}>
           <span>{t("language")}</span>
@@ -73,7 +73,7 @@ export default function SettingsPage() {
                 key={l}
                 onClick={() => setLang(l)}
                 className={`rounded-md border px-4 py-1.5 text-sm ${
-                  lang === l ? "accent-bg border-[--accent]" : "border-[--color-line] text-[--color-ink-soft]"
+                  lang === l ? "accent-bg border-(--accent)" : "border-(--color-line) text-(--color-ink-soft)"
                 }`}
               >
                 {l === "en" ? "English" : "हिंदी"}
@@ -90,7 +90,7 @@ export default function SettingsPage() {
                 key={s}
                 onClick={() => saveChartStyle(s)}
                 className={`rounded-md border px-4 py-1.5 text-sm ${
-                  chartStyle === s ? "accent-bg border-[--accent]" : "border-[--color-line] text-[--color-ink-soft]"
+                  chartStyle === s ? "accent-bg border-(--accent)" : "border-(--color-line) text-(--color-ink-soft)"
                 }`}
               >
                 {s === "north" ? t("northIndian") : t("southIndian")}
@@ -102,7 +102,7 @@ export default function SettingsPage() {
         <div className={row}>
           <div>
             <span>{t("aiStatus")}</span>
-            <p className="mt-1 text-xs text-[--color-ink-soft]">
+            <p className="mt-1 text-xs text-(--color-ink-soft)">
               {ai === null
                 ? "…"
                 : ai.claude || ai.gemini
@@ -115,17 +115,17 @@ export default function SettingsPage() {
         <div className={row}>
           <div>
             <span>{t("exportData")} / {t("importData")}</span>
-            <p className="mt-1 text-xs text-[--color-ink-soft]">{t("dataNote")}</p>
+            <p className="mt-1 text-xs text-(--color-ink-soft)">{t("dataNote")}</p>
             {message && <p className="mt-1 text-xs accent-text">{message}</p>}
           </div>
           <div className="flex gap-2">
             <button
               onClick={exportData}
-              className="rounded-md border border-[--color-line] px-4 py-1.5 text-sm text-[--color-ink-soft] hover:text-[--color-ink]"
+              className="rounded-md border border-(--color-line) px-4 py-1.5 text-sm text-(--color-ink-soft) hover:text-(--color-ink)"
             >
               ⬇ Export
             </button>
-            <label className="cursor-pointer rounded-md border border-[--color-line] px-4 py-1.5 text-sm text-[--color-ink-soft] hover:text-[--color-ink]">
+            <label className="cursor-pointer rounded-md border border-(--color-line) px-4 py-1.5 text-sm text-(--color-ink-soft) hover:text-(--color-ink)">
               ⬆ Import
               <input type="file" accept=".json" className="hidden" onChange={importData} />
             </label>
