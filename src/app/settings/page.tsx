@@ -163,10 +163,12 @@ export default function SettingsPage() {
               <div className="rounded-lg border border-(--color-line) p-3">
                 <p className="text-xs text-(--color-ink-soft)">{t("aiUsageToday")}</p>
                 <p className="mt-1 text-lg font-semibold accent-text">
-                  {usage.callsToday}/{cfg.dailyLimit}{" "}
-                  <span className="text-xs font-normal">{t("calls")}</span>
+                  {Math.max(0, cfg.dailyLimit - usage.callsToday)}{" "}
+                  <span className="text-xs font-normal">{t("remainingToday")}</span>
                 </p>
-                <p className="text-xs text-(--color-ink-soft)">{fmtCost(usage.costTodayUsd)}</p>
+                <p className="text-xs text-(--color-ink-soft)">
+                  {usage.callsToday}/{cfg.dailyLimit} {t("calls")} · {fmtCost(usage.costTodayUsd)}
+                </p>
               </div>
               <div className="rounded-lg border border-(--color-line) p-3">
                 <p className="text-xs text-(--color-ink-soft)">{t("aiCost30d")}</p>

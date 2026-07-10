@@ -226,7 +226,7 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
                 }`}
                 title={t("aiUsageToday")}
               >
-                ✨ {usage.callsToday}/{cfg.dailyLimit} {t("calls")} · {fmtCost(usage.costTodayUsd)}
+                ✨ {Math.max(0, cfg.dailyLimit - usage.callsToday)} {t("remainingToday")} ({usage.callsToday}/{cfg.dailyLimit}) · {fmtCost(usage.costTodayUsd)}
               </Link>
             )}
           </div>

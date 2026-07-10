@@ -192,6 +192,7 @@ export const en = {
   aiModeNever: "Never — offline engine only",
   aiDailyLimit: "Daily AI call limit",
   aiUsageToday: "AI usage today",
+  remainingToday: "left today",
   aiCost30d: "Est. cost (last 30 days)",
   aiLimitReached: "Daily AI limit reached — no more AI calls today. Raise the limit in Settings if needed.",
   calls: "calls",

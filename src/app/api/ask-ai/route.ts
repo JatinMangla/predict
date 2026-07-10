@@ -14,10 +14,10 @@ export const maxDuration = 60;
 const BodySchema = z.object({
   question: z.string().min(3).max(600),
   lang: z.enum(["en", "hi"]),
-  /** Compact kundli summary produced client-side — no account data */
+  /** Full kundli context produced client-side — no account data */
   kundli: z
     .object({
-      lagna: z.string().max(60),
+      lagna: z.string().max(100),
       planets: z
         .array(
           z.object({
@@ -32,10 +32,19 @@ const BodySchema = z.object({
           })
         )
         .max(10),
-      currentDasha: z.string().max(200),
+      houseLords: z.array(z.string().max(160)).max(12).optional(),
+      navamsa: z.string().max(500).optional(),
+      dasamsa: z.string().max(500).optional(),
+      sav: z.string().max(300).optional(),
+      currentDasha: z.string().max(300),
+      upcomingDashas: z.array(z.string().max(120)).max(10).optional(),
+      transits: z.array(z.string().max(120)).max(10).optional(),
+      sadeSati: z.string().max(20).optional(),
       yogas: z.array(z.string().max(120)).max(40),
       moonNakshatra: z.string().max(40).optional(),
       birthDate: z.string().max(20).optional(),
+      gender: z.string().max(10).optional(),
+      ageYears: z.number().int().min(0).max(130).optional(),
     })
     .strict(),
 });
@@ -65,14 +74,37 @@ function buildPrompt(body: z.infer<typeof BodySchema>): string {
     )
     .join("\n");
   return [
-    `Birth chart (Vedic, Lahiri ayanamsa, whole-sign houses):`,
+    `=== NATIVE ===`,
+    `${k.gender ?? "person"}, age ${k.ageYears ?? "unknown"}, born ${k.birthDate ?? "unknown"}`,
+    ``,
+    `=== RASI CHART D1 (Vedic, Lahiri ayanamsa, whole-sign houses) ===`,
     `Ascendant (lagna): ${k.lagna}`,
     planetLines,
-    `Current Vimshottari dasha: ${k.currentDasha}`,
-    k.yogas.length ? `Yogas/doshas present: ${k.yogas.join("; ")}` : "",
-    k.moonNakshatra ? `Birth nakshatra: ${k.moonNakshatra}` : "",
+    k.moonNakshatra ? `Birth nakshatra (Moon): ${k.moonNakshatra}` : "",
     ``,
-    `Question: ${body.question}`,
+    k.houseLords?.length
+      ? `=== HOUSE LORDS AND THEIR PLACEMENTS ===\n${k.houseLords.join("\n")}`
+      : "",
+    ``,
+    k.navamsa ? `=== NAVAMSA D9 (marriage, inner strength) ===\n${k.navamsa}` : "",
+    k.dasamsa ? `=== DASAMSA D10 (career) ===\n${k.dasamsa}` : "",
+    ``,
+    `=== VIMSHOTTARI DASHA ===`,
+    `Running now: ${k.currentDasha}`,
+    k.upcomingDashas?.length
+      ? `Upcoming antardashas: ${k.upcomingDashas.join("; ")}`
+      : "",
+    ``,
+    k.transits?.length
+      ? `=== CURRENT TRANSITS (GOCHAR, today) ===\n${k.transits.join("\n")}\nSade Sati status: ${k.sadeSati ?? "unknown"}`
+      : "",
+    ``,
+    k.sav ? `=== SARVASHTAKAVARGA (bindus per sign; 28+ strong, <25 weak) ===\n${k.sav}` : "",
+    ``,
+    k.yogas.length ? `=== YOGAS / DOSHAS ===\n${k.yogas.join("\n")}` : "",
+    ``,
+    `=== QUESTION ===`,
+    body.question,
   ]
     .filter(Boolean)
     .join("\n");
@@ -80,16 +112,24 @@ function buildPrompt(body: z.infer<typeof BodySchema>): string {
 
 const SYSTEM_PROMPT = (lang: "en" | "hi") =>
   [
-    "You are an expert Vedic astrologer (Jyotish) with deep knowledge of Parashari principles: house significations, planetary dignities, yogas, Vimshottari dashas and gochar transits.",
-    "Read the provided birth chart carefully and answer the question specifically from THIS chart — cite the exact placements, lords, dashas or yogas that support each point.",
-    "BE COMPLETELY HONEST AND UNBIASED. Do NOT sugar-coat, do NOT give false reassurance, and do NOT skew positive. If the chart shows affliction, delay, loss, conflict, health risk or failure in the asked area, state it plainly and explain why.",
-    "Structure every answer with BOTH sides: first 'Supportive factors:' listing genuine strengths, then 'Challenges:' listing every relevant negative factor with equal detail. If one side is empty, say so explicitly rather than padding.",
-    "End with a one-line realistic verdict (favourable / mixed / unfavourable and why). Offer at most one simple, non-commercial remedy only if genuinely relevant.",
-    "Never invent placements not present in the data. Keep the answer to 150-280 words.",
+    "You are a master Vedic astrologer (Jyotish) trained in classical Parashari methods: bhava significations, house lordships, planetary dignities and avasthas, yogas, Vimshottari dasha interpretation, divisional charts (D9 navamsa, D10 dasamsa), ashtakavarga and gochar transits.",
+    "You are given the native's COMPLETE chart data: D1 with degrees and nakshatras, every house lord's placement, D9, D10, sarvashtakavarga, the running and upcoming dashas, and today's transit sky. USE ALL OF IT.",
+    "",
+    "METHOD — before answering, silently work through: (1) which houses, karakas and divisional chart govern the question; (2) the condition of those house lords and karakas in D1 AND the relevant varga; (3) what the running mahadasha/antardasha and the listed upcoming antardashas promise or deny for this matter; (4) how today's transits (especially Saturn, Jupiter, Rahu and sade sati) modify it; (5) relevant yogas/doshas.",
+    "",
+    "ANSWER FORMAT — write a COMPLETE, exhaustive reading with NO length limit: cover everything relevant in full detail, using these clearly separated sections:",
+    "1. **Direct answer** — answer the EXACT question asked in the first 2-3 sentences, plainly (yes / no / mixed / when). Never dodge the question.",
+    "2. **What your chart shows** — the specific placements driving this answer: name the houses, lords, degrees, dignities, vargas and yogas, and explain in plain language what each one MEANS for this question. Do not just list placements — interpret them.",
+    "3. **Timing** — the exact dasha windows (with dates from the data) and transit periods when this matter can materialise, improve or worsen. If the current period denies it, say when the next real window opens.",
+    "4. **Supportive factors** — every genuine strength, with the reason it helps.",
+    "5. **Challenges** — every affliction, weakness or obstruction, stated with equal weight and detail. NEVER soften, hide or balance away a negative. If the honest reading is unfavourable, say so.",
+    "6. **Verdict & guidance** — a realistic verdict (favourable / mixed / unfavourable), followed by ALL practical suggestions that fit the chart: concrete actions, best timing to act, what to avoid, and every classical non-commercial remedy relevant to the afflicted planets (mantra, charity, fasting day, conduct changes) with a one-line reason each.",
+    "",
+    "RULES: cite only placements present in the given data — never invent. Be decisive: prefer a clear judgement with reasoning over vague 'time will tell' language. Where classical principles conflict, mention the tension and which factor dominates and why.",
     lang === "hi"
-      ? "उत्तर हिंदी में दें। 'अनुकूल पक्ष:' और 'चुनौतियाँ:' शीर्षकों का प्रयोग करें।"
+      ? "पूरा उत्तर हिंदी में लिखें। अनुभाग शीर्षक: प्रत्यक्ष उत्तर, कुंडली क्या दर्शाती है, समय, अनुकूल पक्ष, चुनौतियाँ, निष्कर्ष व मार्गदर्शन।"
       : "Answer in English.",
-  ].join(" ");
+  ].join("\n");
 
 export interface AiUsage {
   inputTokens: number;
@@ -110,7 +150,8 @@ async function askClaude(
     const client = new Anthropic();
     const response = await client.messages.create({
       model: "claude-opus-4-8",
-      max_tokens: 1200,
+      max_tokens: 8000,
+      thinking: { type: "adaptive" },
       system: SYSTEM_PROMPT(body.lang),
       messages: [{ role: "user", content: buildPrompt(body) }],
     });
@@ -157,9 +198,13 @@ async function askGemini(
             parts: [{ text: SYSTEM_PROMPT(body.lang) }],
           },
           contents: [{ parts: [{ text: buildPrompt(body) }] }],
-          generationConfig: { maxOutputTokens: 1200 },
+          generationConfig: {
+            maxOutputTokens: 8192,
+            // Let the model reason deeply before writing the reading
+            thinkingConfig: { thinkingBudget: 3072 },
+          },
         }),
-        signal: AbortSignal.timeout(45_000),
+        signal: AbortSignal.timeout(55_000),
       }
     );
     if (!res.ok) return null;

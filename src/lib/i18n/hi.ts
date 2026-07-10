@@ -194,6 +194,7 @@ export const hi: Dict = {
   aiModeNever: "कभी नहीं — केवल ऑफ़लाइन इंजन",
   aiDailyLimit: "दैनिक AI कॉल सीमा",
   aiUsageToday: "आज का AI उपयोग",
+  remainingToday: "आज शेष",
   aiCost30d: "अनुमानित लागत (पिछले 30 दिन)",
   aiLimitReached: "दैनिक AI सीमा पूर्ण — आज और AI कॉल नहीं होंगी। आवश्यकता हो तो सेटिंग्स में सीमा बढ़ाएँ।",
   calls: "कॉल",

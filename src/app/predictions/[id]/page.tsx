@@ -141,7 +141,7 @@ export default function PredictionsPage({ params }: { params: Promise<{ id: stri
                 }`}
                 title={t("aiUsageToday")}
               >
-                ✨ {usage.callsToday}/{cfg.dailyLimit} {t("calls")} · {fmtCost(usage.costTodayUsd)}
+                ✨ {Math.max(0, cfg.dailyLimit - usage.callsToday)} {t("remainingToday")} ({usage.callsToday}/{cfg.dailyLimit}) · {fmtCost(usage.costTodayUsd)}
               </Link>
             )}
             <div className="flex gap-1 rounded-lg border border-(--color-line) p-1 text-sm">
