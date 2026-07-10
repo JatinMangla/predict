@@ -145,7 +145,7 @@ async function askGemini(
   if (!key) return null;
   try {
     const res = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
       {
         method: "POST",
         headers: {
@@ -198,9 +198,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid-request" }, { status: 400 });
   }
 
-  // Optional user-supplied free Gemini key (kept in their browser only)
+  // Optional user-supplied free Gemini key (kept in their browser only).
+  // Accepts both classic "AIza…" keys and the newer "AQ."-prefixed format.
   const rawClientKey = req.headers.get("x-gemini-key") ?? "";
-  const clientKey = /^[A-Za-z0-9_-]{20,80}$/.test(rawClientKey)
+  const clientKey = /^[A-Za-z0-9._-]{20,100}$/.test(rawClientKey)
     ? rawClientKey
     : null;
 

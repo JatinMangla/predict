@@ -120,7 +120,7 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
     [kundli, cfg, aiBusy, limitReached, lang, t, profileId, refreshUsage]
   );
 
-  const askEngine = (q: string) => {
+  const askEngine = (q: string, escalateIfUnsure: boolean) => {
     if (!kundli || !cfg) return;
     const result = answerQuestion(q, kundli);
     const answer = lang === "hi" ? result.answer.hi : result.answer.en;
@@ -143,12 +143,43 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
       confidence: result.confidence,
       createdAt: Date.now(),
     });
-    // AI escalation per user's mode: always → every question; fallback → low confidence
-    const shouldEscalate =
-      cfg.mode === "always" || (cfg.mode === "fallback" && low);
-    if (shouldEscalate && canUseAi && navigator.onLine) {
+    if (escalateIfUnsure && low && canUseAi && navigator.onLine) {
       void askAI(q, true);
     }
+  };
+
+  /** AI-first: send straight to AI; only fall back to the engine if AI fails */
+  const askAiFirst = async (q: string) => {
+    if (!kundli || !cfg) return;
+    setAiBusy(true);
+    setNotice("");
+    const result = await callAi(q, kundli, lang, cfg);
+    setAiBusy(false);
+    refreshUsage();
+    if (typeof result === "string") {
+      // AI unreachable/limited — offline engine keeps the app functional
+      if (result === "limit-reached") setNotice(t("aiLimitReached"));
+      else setNotice(t("aiUnavailable"));
+      askEngine(q, false);
+      return;
+    }
+    setItems((prev) => [
+      ...prev,
+      {
+        question: q,
+        answer: result.answer,
+        source: "ai",
+        provider: result.provider,
+        costUsd: result.costUsd,
+      },
+    ]);
+    void saveRecord({
+      profileId,
+      question: q,
+      answer: result.answer,
+      source: "ai",
+      createdAt: Date.now(),
+    });
   };
 
   const submit = (e: React.FormEvent) => {
@@ -156,7 +187,10 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
     const q = question.trim();
     if (!q) return;
     setQuestion("");
-    askEngine(q);
+    const aiFirst =
+      cfg?.mode === "always" && canUseAi && navigator.onLine && !limitReached;
+    if (aiFirst) void askAiFirst(q);
+    else askEngine(q, cfg?.mode === "fallback");
   };
 
   if (loading) return <AppShell><p className="p-8 text-center text-(--color-ink-soft)">{t("loading")}</p></AppShell>;

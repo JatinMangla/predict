@@ -164,6 +164,36 @@ export default function PredictionsPage({ params }: { params: Promise<{ id: stri
           <p className="leading-relaxed">{pick(prediction.summary)}</p>
         </div>
 
+        {/* AI Insight — primary reading (auto-loads in Always mode) */}
+        {cfg && cfg.mode !== "never" && (
+          <div className="card mb-5 border-l-4 border-violet-500/40 p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-medium text-violet-300">
+                {t("aiInsight")}
+                {aiText && ` · ${aiText.provider} · ${aiText.costUsd === 0 ? t("free") : fmtCost(aiText.costUsd)}`}
+              </h3>
+              {!aiText && !aiBusy && canUseAi && (
+                <button
+                  onClick={fetchAiInsight}
+                  disabled={limitReached}
+                  className="rounded-lg border border-violet-500/40 px-4 py-2 text-sm text-violet-300 transition hover:bg-violet-500/10 disabled:opacity-50"
+                  title={limitReached ? t("aiLimitReached") : undefined}
+                >
+                  {t("getAiInsight")}
+                </button>
+              )}
+            </div>
+            {aiBusy && <p className="mt-2 text-sm text-(--color-ink-soft)">✨ {t("aiThinking")}</p>}
+            {aiNotice && <p className="mt-2 text-sm text-orange-300">{aiNotice}</p>}
+            {!canUseAi && !aiText && (
+              <p className="mt-2 text-xs text-(--color-ink-soft)">{t("aiNotConfigured")}</p>
+            )}
+            {aiText && (
+              <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed">{aiText.text}</p>
+            )}
+          </div>
+        )}
+
         {/* Area meters */}
         <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
           {areaEntries.map(([label, score]) => (
@@ -211,35 +241,6 @@ export default function PredictionsPage({ params }: { params: Promise<{ id: stri
           ))}
         </div>
 
-        {/* AI Insight — optional, limit-gated, cost shown */}
-        {cfg && cfg.mode !== "never" && (
-          <div className="card mt-5 border-l-4 border-violet-500/40 p-5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-sm font-medium text-violet-300">
-                {t("aiInsight")}
-                {aiText && ` · ${aiText.provider} · ${aiText.costUsd === 0 ? t("free") : fmtCost(aiText.costUsd)}`}
-              </h3>
-              {!aiText && !aiBusy && canUseAi && (
-                <button
-                  onClick={fetchAiInsight}
-                  disabled={limitReached}
-                  className="rounded-lg border border-violet-500/40 px-4 py-2 text-sm text-violet-300 transition hover:bg-violet-500/10 disabled:opacity-50"
-                  title={limitReached ? t("aiLimitReached") : undefined}
-                >
-                  {t("getAiInsight")}
-                </button>
-              )}
-            </div>
-            {aiBusy && <p className="mt-2 text-sm text-(--color-ink-soft)">✨ {t("aiThinking")}</p>}
-            {aiNotice && <p className="mt-2 text-sm text-orange-300">{aiNotice}</p>}
-            {!canUseAi && !aiText && (
-              <p className="mt-2 text-xs text-(--color-ink-soft)">{t("aiNotConfigured")}</p>
-            )}
-            {aiText && (
-              <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed">{aiText.text}</p>
-            )}
-          </div>
-        )}
       </AppShell>
     </ProfileTheme>
   );

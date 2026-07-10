@@ -46,7 +46,8 @@ export async function getAiConfig(): Promise<AiConfig> {
     // offline — server availability unknown
   }
   return {
-    mode: mode === "always" || mode === "never" ? mode : "fallback",
+    // AI-first by default: unset → "always"
+    mode: mode === "fallback" || mode === "never" ? mode : "always",
     dailyLimit: Math.max(0, Number(limit) || DEFAULT_DAILY_LIMIT),
     geminiKey: key ?? "",
     serverClaude,
