@@ -19,8 +19,11 @@ import {
   personalDayQuality,
   LUNAR_MONTHS,
   TARABALA9,
+  TARA_GUIDANCE,
+  CHANDRA_WEAK_NOTE,
   type CalendarDayInfo,
 } from "@/lib/astro/hinduCalendar";
+import { DayTimingsCard } from "@/components/DayTimingsCard";
 import { computePanchang } from "@/lib/astro/panchang";
 import { activeDashas } from "@/lib/astro/dasha";
 import { VARA_NAMES } from "@/lib/astro/constants";
@@ -172,6 +175,11 @@ export default function PersonalCalendarPage({
                   <span className="text-[9px] leading-tight text-(--color-ink-soft)">
                     {tithiName(d.tithi, lang)}
                   </span>
+                  {d.festivals.length > 0 && (
+                    <span className="rounded bg-rose-400/20 px-1 text-[9px] leading-tight text-rose-300">
+                      🪔 {(lang === "hi" ? d.festivals[0].hi : d.festivals[0].en).split(" · ")[0].split(" (")[0]}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -235,9 +243,50 @@ export default function PersonalCalendarPage({
                     <dt className="text-xs text-(--color-ink-soft)">{t("nakshatra")}</dt>
                     <dd>{nakshatraName(selected.nakshatra, lang)}</dd>
                   </div>
+                  {selected.festivals.length > 0 && (
+                    <div>
+                      <dt className="text-xs text-(--color-ink-soft)">{t("festivalsLabel")}</dt>
+                      {selected.festivals.map((f, i) => (
+                        <dd key={i} className="text-rose-300">🪔 {lang === "hi" ? f.hi : f.en}</dd>
+                      ))}
+                    </div>
+                  )}
                 </dl>
               </div>
-              <div className="md:col-span-2">
+              <div className="space-y-4 md:col-span-2">
+                {/* Personal day prediction: do / avoid / precaution */}
+                <div className="card p-4">
+                  <h4 className="mb-2 text-sm font-medium text-(--color-gold-soft)">
+                    📋 {t("predictionFor")}{" "}
+                    {new Date(selected.dayStartMs + 12 * 3600 * 1000).toLocaleDateString(
+                      lang === "hi" ? "hi-IN" : "en-IN",
+                      { day: "numeric", month: "short" }
+                    )}
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <p>
+                      <span className="font-medium text-emerald-300">✓ {t("doToday")}: </span>
+                      {lang === "hi"
+                        ? TARA_GUIDANCE[selectedQ.taraIndex].do.hi
+                        : TARA_GUIDANCE[selectedQ.taraIndex].do.en}
+                    </p>
+                    <p>
+                      <span className="font-medium text-red-300">✕ {t("avoidToday")}: </span>
+                      {lang === "hi"
+                        ? TARA_GUIDANCE[selectedQ.taraIndex].avoid.hi
+                        : TARA_GUIDANCE[selectedQ.taraIndex].avoid.en}
+                    </p>
+                    <p>
+                      <span className="font-medium text-amber-300">⚠ {t("precautionLabel")}: </span>
+                      {lang === "hi"
+                        ? TARA_GUIDANCE[selectedQ.taraIndex].note.hi
+                        : TARA_GUIDANCE[selectedQ.taraIndex].note.en}
+                      {!selectedQ.chandraGood &&
+                        ` ${lang === "hi" ? CHANDRA_WEAK_NOTE.hi : CHANDRA_WEAK_NOTE.en}`}
+                    </p>
+                  </div>
+                </div>
+                <DayTimingsCard day={selected} />
                 <PanchangCard
                   panchang={selectedPanchang}
                   title={`${t("tithi")} · ${t("vara")} · ${t("nakshatra")} · ${t("yogaP")} · ${t("karana")}`}

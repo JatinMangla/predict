@@ -7,6 +7,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildMonthCalendar,
   lunarMonthInfo,
+  dayTimings,
   LUNAR_MONTHS,
 } from "./hinduCalendar";
 
@@ -45,6 +46,70 @@ describe("hindu calendar month grid", () => {
       const diff = (jan2024[i].tithi - jan2024[i - 1].tithi + 30) % 30;
       expect(diff).toBeLessThanOrEqual(2); // 0 (rare), 1 or 2 (kshaya tithi)
     }
+  });
+});
+
+describe("festivals (validated against 2024 panchang)", () => {
+  const fest = (year: number, month: number) =>
+    buildMonthCalendar(year, month, DELHI.lat, DELHI.lon, DELHI.tz);
+
+  it("Diwali falls on 31 Oct or 1 Nov 2024", () => {
+    const oct = fest(2024, 9);
+    const nov = fest(2024, 10);
+    const days = [...oct, ...nov].filter((d) =>
+      d.festivals.some((f) => f.en.includes("Diwali"))
+    );
+    expect(days.length).toBeGreaterThanOrEqual(1);
+    const labels = days.map(
+      (d) => `${new Date(d.dayStartMs + 12 * 3600 * 1000).getMonth()}-${d.day}`
+    );
+    expect(labels.some((l) => l === "9-31" || l === "10-1")).toBe(true);
+  });
+
+  it("Maha Shivratri on 8 Mar 2024", () => {
+    const mar = fest(2024, 2);
+    const day = mar.find((d) => d.festivals.some((f) => f.en.includes("Shivratri")));
+    expect(day?.day).toBe(8);
+  });
+
+  it("Krishna Janmashtami on 26 Aug 2024 (±1 day)", () => {
+    const aug = fest(2024, 7);
+    const day = aug.find((d) => d.festivals.some((f) => f.en.includes("Janmashtami")));
+    expect(day).toBeDefined();
+    expect(Math.abs(day!.day - 26)).toBeLessThanOrEqual(1);
+  });
+
+  it("Makar Sankranti named on 15 Jan 2024", () => {
+    const jan = fest(2024, 0);
+    const d15 = jan.find((d) => d.day === 15)!;
+    expect(d15.festivals.some((f) => f.en.includes("Makar Sankranti"))).toBe(true);
+  });
+
+  it("Holi (Dhulandi) on 25 Mar 2024", () => {
+    const mar = fest(2024, 2);
+    const day = mar.find((d) => d.festivals.some((f) => f.en.includes("Holi (")));
+    expect(day?.day).toBe(25);
+  });
+});
+
+describe("day timings", () => {
+  it("Rahu Kaal on Monday is the 2nd octant of the day", () => {
+    const jan = buildMonthCalendar(2024, 0, DELHI.lat, DELHI.lon, DELHI.tz);
+    const monday = jan.find((d) => d.weekday === 1 && d.sunriseMs && d.sunsetMs)!;
+    const tm = dayTimings(monday);
+    const span = monday.sunsetMs! - monday.sunriseMs!;
+    expect(tm.rahuKaal![0]).toBeCloseTo(monday.sunriseMs! + span / 8, -3);
+    expect(tm.rahuKaal![1]).toBeCloseTo(monday.sunriseMs! + span / 4, -3);
+  });
+  it("Abhijit straddles solar noon and is absent on Wednesday", () => {
+    const jan = buildMonthCalendar(2024, 0, DELHI.lat, DELHI.lon, DELHI.tz);
+    const thu = jan.find((d) => d.weekday === 4 && d.sunriseMs && d.sunsetMs)!;
+    const tm = dayTimings(thu);
+    const mid = (thu.sunriseMs! + thu.sunsetMs!) / 2;
+    expect(tm.abhijit![0]).toBeLessThan(mid);
+    expect(tm.abhijit![1]).toBeGreaterThan(mid);
+    const wed = jan.find((d) => d.weekday === 3 && d.sunriseMs && d.sunsetMs)!;
+    expect(dayTimings(wed).abhijit).toBeNull();
   });
 });
 

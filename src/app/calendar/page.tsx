@@ -12,6 +12,7 @@ import { useI18n } from "@/lib/i18n";
 import { AppShell } from "@/components/AppShell";
 import { MoonPhase } from "@/components/MoonPhase";
 import { PanchangCard } from "@/components/kundli/PanchangCard";
+import { DayTimingsCard } from "@/components/DayTimingsCard";
 import {
   buildMonthCalendar,
   lunarMonthInfo,
@@ -202,10 +203,16 @@ export default function CalendarPage() {
                   }`}
                   title={d.paksha === "shukla" ? t("shukla") : t("krishna")}
                 />
-                {badge && (
-                  <span className={`rounded px-1 text-[9px] leading-tight ${badge.cls}`}>
-                    {badge.text}
+                {d.festivals.length > 0 ? (
+                  <span className="rounded bg-rose-400/20 px-1 text-[9px] leading-tight text-rose-300">
+                    🪔 {(lang === "hi" ? d.festivals[0].hi : d.festivals[0].en).split(" · ")[0].split(" (")[0]}
                   </span>
+                ) : (
+                  badge && (
+                    <span className={`rounded px-1 text-[9px] leading-tight ${badge.cls}`}>
+                      {badge.text}
+                    </span>
+                  )
                 )}
               </button>
             );
@@ -245,12 +252,23 @@ export default function CalendarPage() {
                     : SIGN_NAMES[selected.sankrantiSign].en}
                 </p>
               )}
+              {selected.festivals.length > 0 && (
+                <div className="mt-2 text-center">
+                  <p className="text-xs text-(--color-ink-soft)">{t("festivalsLabel")}</p>
+                  {selected.festivals.map((f, i) => (
+                    <p key={i} className="text-sm font-medium text-rose-300">
+                      🪔 {lang === "hi" ? f.hi : f.en}
+                    </p>
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="md:col-span-2">
+            <div className="space-y-4 md:col-span-2">
               <PanchangCard
                 panchang={selectedPanchang}
                 title={`${t("tithi")} · ${t("vara")} · ${t("nakshatra")} · ${t("yogaP")} · ${t("karana")}`}
               />
+              <DayTimingsCard day={selected} />
             </div>
           </div>
         )}

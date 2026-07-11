@@ -62,6 +62,13 @@ export function fmtDate(ms: number, lang: Lang, opts?: Intl.DateTimeFormatOption
   });
 }
 
+export function fmtTime(ms: number, lang: Lang): string {
+  return new Date(ms).toLocaleTimeString(lang === "hi" ? "hi-IN" : "en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function fmtDateTime(ms: number, lang: Lang): string {
   return new Date(ms).toLocaleString(lang === "hi" ? "hi-IN" : "en-IN", {
     day: "numeric",
