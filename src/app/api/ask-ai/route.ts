@@ -117,13 +117,13 @@ const SYSTEM_PROMPT = (lang: "en" | "hi") =>
     "",
     "METHOD — before answering, silently work through: (1) which houses, karakas and divisional chart govern the question; (2) the condition of those house lords and karakas in D1 AND the relevant varga; (3) what the running mahadasha/antardasha and the listed upcoming antardashas promise or deny for this matter; (4) how today's transits (especially Saturn, Jupiter, Rahu and sade sati) modify it; (5) relevant yogas/doshas.",
     "",
-    "ANSWER FORMAT — write a COMPLETE, exhaustive reading with NO length limit: cover everything relevant in full detail, using these clearly separated sections:",
+    "ANSWER FORMAT — write a CRISP, SUMMARISED reading of 250-400 words total. Use short bullet points inside each section, covering only the most decisive factors — no padding, no repetition, no generic filler. Sections:",
     "1. **Direct answer** — answer the EXACT question asked in the first 2-3 sentences, plainly (yes / no / mixed / when). Never dodge the question.",
-    "2. **What your chart shows** — the specific placements driving this answer: name the houses, lords, degrees, dignities, vargas and yogas, and explain in plain language what each one MEANS for this question. Do not just list placements — interpret them.",
-    "3. **Timing** — the exact dasha windows (with dates from the data) and transit periods when this matter can materialise, improve or worsen. If the current period denies it, say when the next real window opens.",
-    "4. **Supportive factors** — every genuine strength, with the reason it helps.",
-    "5. **Challenges** — every affliction, weakness or obstruction, stated with equal weight and detail. NEVER soften, hide or balance away a negative. If the honest reading is unfavourable, say so.",
-    "6. **Verdict & guidance** — a realistic verdict (favourable / mixed / unfavourable), followed by ALL practical suggestions that fit the chart: concrete actions, best timing to act, what to avoid, and every classical non-commercial remedy relevant to the afflicted planets (mantra, charity, fasting day, conduct changes) with a one-line reason each.",
+    "2. **What your chart shows** — 3-5 bullets: only the placements that actually decide this answer (house, lord, varga, yoga), each with a plain-language meaning. Interpret, don't list.",
+    "3. **Timing** — 2-3 bullets with exact dasha windows (dates from the data) and the key transit. If the current period denies the matter, name the next real window.",
+    "4. **Supportive factors** — 2-3 bullets, strongest first.",
+    "5. **Challenges** — 2-3 bullets, stated bluntly with equal weight. NEVER soften or hide a negative; if the honest reading is unfavourable, say so.",
+    "6. **Verdict & guidance** — one-line realistic verdict (favourable / mixed / unfavourable), then 2-4 short bullets: the practical actions, what to avoid, and the most relevant classical remedies (one line each).",
     "",
     "RULES: cite only placements present in the given data — never invent. Be decisive: prefer a clear judgement with reasoning over vague 'time will tell' language. Where classical principles conflict, mention the tension and which factor dominates and why.",
     lang === "hi"
@@ -179,7 +179,7 @@ async function askClaude(
 async function askGemini(
   body: z.infer<typeof BodySchema>,
   clientKey: string | null
-): Promise<{ text: string; usage: AiUsage } | null> {
+): Promise<{ text: string; usage: AiUsage } | "quota" | null> {
   // Server key first; otherwise the user's own free-tier key sent from the
   // browser (stored only client-side).
   const key = process.env.GEMINI_API_KEY || clientKey;
@@ -207,6 +207,7 @@ async function askGemini(
         signal: AbortSignal.timeout(55_000),
       }
     );
+    if (res.status === 429) return "quota"; // Google's real free-tier quota is exhausted
     if (!res.ok) return null;
     const data = await res.json();
     const text: string | undefined =
@@ -260,6 +261,10 @@ export async function POST(req: Request) {
   }
 
   const gemini = await askGemini(body, clientKey);
+  if (gemini === "quota") {
+    // Google's actual daily free quota is used up — tell the client precisely
+    return NextResponse.json({ error: "provider-quota" }, { status: 429 });
+  }
   if (gemini) {
     return NextResponse.json({
       answer: gemini.text,

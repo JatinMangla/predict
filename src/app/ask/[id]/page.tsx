@@ -18,6 +18,7 @@ import {
   callAi,
   aiAvailable,
   fmtCost,
+  GEMINI_FREE_RPD,
   type AiConfig,
   type UsageSummary,
 } from "@/lib/aiClient";
@@ -71,8 +72,9 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
   }, [items]);
 
   const canUseAi = cfg !== null && cfg.mode !== "never" && aiAvailable(cfg);
-  const limitReached =
-    cfg !== null && usage !== null && usage.callsToday >= cfg.dailyLimit;
+  // Google's REAL free quota (only blocks when Claude isn't there as backup)
+  const quotaExhausted =
+    cfg !== null && usage !== null && usage.geminiRemaining <= 0 && !cfg.serverClaude;
 
   const saveRecord = async (rec: Omit<QARecord, "id">) => {
     try {
@@ -85,17 +87,13 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
   const askAI = useCallback(
     async (q: string, auto = false) => {
       if (!kundli || !cfg || aiBusy) return;
-      if (limitReached) {
-        if (!auto) setNotice(t("aiLimitReached"));
-        return;
-      }
       setAiBusy(true);
       setNotice("");
       const result = await callAi(q, kundli, lang, cfg);
       setAiBusy(false);
       refreshUsage();
       if (typeof result === "string") {
-        if (result === "limit-reached") setNotice(t("aiLimitReached"));
+        if (result === "quota-exhausted") setNotice(t("aiQuotaExhausted"));
         else if (!auto) setNotice(t("aiUnavailable"));
         return;
       }
@@ -117,7 +115,7 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
         createdAt: Date.now(),
       });
     },
-    [kundli, cfg, aiBusy, limitReached, lang, t, profileId, refreshUsage]
+    [kundli, cfg, aiBusy, lang, t, profileId, refreshUsage]
   );
 
   const askEngine = (q: string, escalateIfUnsure: boolean) => {
@@ -157,8 +155,8 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
     setAiBusy(false);
     refreshUsage();
     if (typeof result === "string") {
-      // AI unreachable/limited — offline engine keeps the app functional
-      if (result === "limit-reached") setNotice(t("aiLimitReached"));
+      // AI unreachable or real quota used up — engine keeps the app working
+      if (result === "quota-exhausted") setNotice(t("aiQuotaExhausted"));
       else setNotice(t("aiUnavailable"));
       askEngine(q, false);
       return;
@@ -188,7 +186,7 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
     if (!q) return;
     setQuestion("");
     const aiFirst =
-      cfg?.mode === "always" && canUseAi && navigator.onLine && !limitReached;
+      cfg?.mode === "always" && canUseAi && navigator.onLine && !quotaExhausted;
     if (aiFirst) void askAiFirst(q);
     else askEngine(q, cfg?.mode === "fallback");
   };
@@ -220,13 +218,14 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
               <Link
                 href="/settings"
                 className={`rounded-full border px-3 py-1 text-xs ${
-                  limitReached
+                  quotaExhausted
                     ? "border-red-500/50 text-red-300"
                     : "border-(--color-line) text-(--color-ink-soft)"
                 }`}
-                title={t("aiUsageToday")}
+                title={t("quotaNote")}
               >
-                ✨ {Math.max(0, cfg.dailyLimit - usage.callsToday)} {t("remainingToday")} ({usage.callsToday}/{cfg.dailyLimit}) · {fmtCost(usage.costTodayUsd)}
+                ✨ {usage.geminiRemaining}/{GEMINI_FREE_RPD} {t("freeCallsLeft")}
+                {usage.costTodayUsd > 0 ? ` · ${fmtCost(usage.costTodayUsd)}` : ""}
               </Link>
             )}
           </div>
@@ -332,10 +331,10 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
             {canUseAi && lastQuestion && (
               <button
                 type="button"
-                disabled={aiBusy || limitReached}
+                disabled={aiBusy || quotaExhausted}
                 onClick={() => askAI(lastQuestion)}
                 className="rounded-xl border border-violet-500/40 px-4 py-3 text-sm text-violet-300 transition hover:bg-violet-500/10 disabled:opacity-50"
-                title={limitReached ? t("aiLimitReached") : t("askAI")}
+                title={quotaExhausted ? t("aiQuotaExhausted") : t("askAI")}
               >
                 ✨ {t("askAI")}
               </button>

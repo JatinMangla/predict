@@ -96,6 +96,7 @@ export default function KundliPage({ params }: { params: Promise<{ id: string }>
             <Link href={`/predictions/${id}`} className="accent-bg rounded-md px-3 py-1.5">{t("predictions")}</Link>
             <Link href={`/transits/${id}`} className="accent-bg rounded-md px-3 py-1.5">{t("transits")}</Link>
             <Link href={`/ask/${id}`} className="accent-bg rounded-md px-3 py-1.5">{t("askQuestion")}</Link>
+            <Link href={`/calendar/${id}`} className="accent-bg rounded-md px-3 py-1.5">{t("calendarNav")}</Link>
           </div>
         </div>
 

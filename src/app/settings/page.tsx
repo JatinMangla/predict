@@ -9,7 +9,7 @@ import {
   getUsageSummary,
   setAiSetting,
   fmtCost,
-  DEFAULT_DAILY_LIMIT,
+  GEMINI_FREE_RPD,
   type AiConfig,
   type AiMode,
   type UsageSummary,
@@ -20,7 +20,6 @@ export default function SettingsPage() {
   const [chartStyle, setChartStyle] = useState<"north" | "south">("north");
   const [cfg, setCfg] = useState<AiConfig | null>(null);
   const [usage, setUsage] = useState<UsageSummary | null>(null);
-  const [limitInput, setLimitInput] = useState(String(DEFAULT_DAILY_LIMIT));
   const [keyInput, setKeyInput] = useState("");
   const [message, setMessage] = useState("");
   const [keyMessage, setKeyMessage] = useState("");
@@ -31,7 +30,6 @@ export default function SettingsPage() {
     });
     getAiConfig().then((c) => {
       setCfg(c);
-      setLimitInput(String(c.dailyLimit));
       setKeyInput(c.geminiKey);
     });
     getUsageSummary().then(setUsage);
@@ -45,13 +43,6 @@ export default function SettingsPage() {
   const saveMode = async (m: AiMode) => {
     await setAiSetting("aiMode", m);
     setCfg((c) => (c ? { ...c, mode: m } : c));
-  };
-
-  const saveLimit = async (v: string) => {
-    setLimitInput(v);
-    const n = Math.max(0, Math.min(500, Number(v) || 0));
-    await setAiSetting("aiDailyLimit", String(n));
-    setCfg((c) => (c ? { ...c, dailyLimit: n } : c));
   };
 
   const saveKey = async () => {
@@ -157,24 +148,25 @@ export default function SettingsPage() {
             </p>
           </div>
 
-          {/* Usage meter — the anti-surprise-bill display */}
-          {usage && cfg && (
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-lg border border-(--color-line) p-3">
-                <p className="text-xs text-(--color-ink-soft)">{t("aiUsageToday")}</p>
-                <p className="mt-1 text-lg font-semibold accent-text">
-                  {Math.max(0, cfg.dailyLimit - usage.callsToday)}{" "}
-                  <span className="text-xs font-normal">{t("remainingToday")}</span>
-                </p>
-                <p className="text-xs text-(--color-ink-soft)">
-                  {usage.callsToday}/{cfg.dailyLimit} {t("calls")} · {fmtCost(usage.costTodayUsd)}
-                </p>
+          {/* Real Gemini free-quota meter — the anti-surprise-bill display */}
+          {usage && (
+            <div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-lg border border-(--color-line) p-3">
+                  <p className="text-xs text-(--color-ink-soft)">{t("aiUsageToday")}</p>
+                  <p className="mt-1 text-lg font-semibold accent-text">
+                    {usage.geminiRemaining}/{GEMINI_FREE_RPD}{" "}
+                    <span className="text-xs font-normal">{t("freeCallsLeft")}</span>
+                  </p>
+                  <p className="text-xs text-(--color-ink-soft)">{fmtCost(usage.costTodayUsd)}</p>
+                </div>
+                <div className="rounded-lg border border-(--color-line) p-3">
+                  <p className="text-xs text-(--color-ink-soft)">{t("aiCost30d")}</p>
+                  <p className="mt-1 text-lg font-semibold accent-text">{fmtCost(usage.cost30dUsd)}</p>
+                  <p className="text-xs text-(--color-ink-soft)">Gemini = {t("free")}</p>
+                </div>
               </div>
-              <div className="rounded-lg border border-(--color-line) p-3">
-                <p className="text-xs text-(--color-ink-soft)">{t("aiCost30d")}</p>
-                <p className="mt-1 text-lg font-semibold accent-text">{fmtCost(usage.cost30dUsd)}</p>
-                <p className="text-xs text-(--color-ink-soft)">Gemini = {t("free")}</p>
-              </div>
+              <p className="mt-1.5 text-xs text-(--color-ink-soft)">{t("quotaNote")}</p>
             </div>
           )}
 
@@ -202,19 +194,6 @@ export default function SettingsPage() {
                 </button>
               ))}
             </div>
-          </div>
-
-          {/* Daily cap */}
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-sm">{t("aiDailyLimit")}</span>
-            <input
-              type="number"
-              min={0}
-              max={500}
-              value={limitInput}
-              onChange={(e) => saveLimit(e.target.value)}
-              className={`${inputCls} w-24 text-center`}
-            />
           </div>
 
           {/* Free Gemini key, stored locally */}

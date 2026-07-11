@@ -22,6 +22,7 @@ import {
   callAi,
   aiAvailable,
   fmtCost,
+  GEMINI_FREE_RPD,
   type AiConfig,
   type UsageSummary,
 } from "@/lib/aiClient";
@@ -60,15 +61,11 @@ export default function PredictionsPage({ params }: { params: Promise<{ id: stri
   }, [period]);
 
   const canUseAi = cfg !== null && cfg.mode !== "never" && aiAvailable(cfg);
-  const limitReached =
-    cfg !== null && usage !== null && usage.callsToday >= cfg.dailyLimit;
+  const quotaExhausted =
+    cfg !== null && usage !== null && usage.geminiRemaining <= 0 && !cfg.serverClaude;
 
   const fetchAiInsight = useCallback(async () => {
     if (!kundli || !prediction || !cfg || aiBusy) return;
-    if (limitReached) {
-      setAiNotice(t("aiLimitReached"));
-      return;
-    }
     setAiBusy(true);
     setAiNotice("");
     const periodLabel = { daily: "today", weekly: "this week", monthly: "this month", yearly: "the coming year" }[prediction.period];
@@ -77,11 +74,11 @@ export default function PredictionsPage({ params }: { params: Promise<{ id: stri
     setAiBusy(false);
     getUsageSummary().then(setUsage);
     if (typeof result === "string") {
-      setAiNotice(result === "limit-reached" ? t("aiLimitReached") : t("aiUnavailable"));
+      setAiNotice(result === "quota-exhausted" ? t("aiQuotaExhausted") : t("aiUnavailable"));
       return;
     }
     setAiText({ text: result.answer, provider: result.provider, costUsd: result.costUsd });
-  }, [kundli, prediction, cfg, aiBusy, limitReached, lang, t]);
+  }, [kundli, prediction, cfg, aiBusy, lang, t]);
 
   // AI mode "always": fetch the insight automatically (once per period view)
   useEffect(() => {
@@ -135,13 +132,14 @@ export default function PredictionsPage({ params }: { params: Promise<{ id: stri
               <Link
                 href="/settings"
                 className={`rounded-full border px-3 py-1 text-xs ${
-                  limitReached
+                  quotaExhausted
                     ? "border-red-500/50 text-red-300"
                     : "border-(--color-line) text-(--color-ink-soft)"
                 }`}
-                title={t("aiUsageToday")}
+                title={t("quotaNote")}
               >
-                ✨ {Math.max(0, cfg.dailyLimit - usage.callsToday)} {t("remainingToday")} ({usage.callsToday}/{cfg.dailyLimit}) · {fmtCost(usage.costTodayUsd)}
+                ✨ {usage.geminiRemaining}/{GEMINI_FREE_RPD} {t("freeCallsLeft")}
+                {usage.costTodayUsd > 0 ? ` · ${fmtCost(usage.costTodayUsd)}` : ""}
               </Link>
             )}
             <div className="flex gap-1 rounded-lg border border-(--color-line) p-1 text-sm">
@@ -175,9 +173,9 @@ export default function PredictionsPage({ params }: { params: Promise<{ id: stri
               {!aiText && !aiBusy && canUseAi && (
                 <button
                   onClick={fetchAiInsight}
-                  disabled={limitReached}
+                  disabled={quotaExhausted}
                   className="rounded-lg border border-violet-500/40 px-4 py-2 text-sm text-violet-300 transition hover:bg-violet-500/10 disabled:opacity-50"
-                  title={limitReached ? t("aiLimitReached") : undefined}
+                  title={quotaExhausted ? t("aiQuotaExhausted") : undefined}
                 >
                   {t("getAiInsight")}
                 </button>
