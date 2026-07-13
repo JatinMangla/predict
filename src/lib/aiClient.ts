@@ -9,13 +9,10 @@ import { db, getSetting, setSetting } from "./db";
 import type { Kundli } from "./astro/types";
 import { buildKundliSummary } from "./kundliSummary";
 
-export type AiMode = "always" | "fallback" | "never";
-
 /** Gemini 2.5 Flash free tier: requests per day (Google-documented) */
 export const GEMINI_FREE_RPD = 250;
 
 export interface AiConfig {
-  mode: AiMode;
   geminiKey: string;
   /** server-side keys present? */
   serverClaude: boolean;
@@ -29,10 +26,7 @@ export interface AiCallResult {
 }
 
 export async function getAiConfig(): Promise<AiConfig> {
-  const [mode, key] = await Promise.all([
-    getSetting("aiMode"),
-    getSetting("geminiKey"),
-  ]);
+  const key = await getSetting("geminiKey");
   let serverClaude = false;
   let serverGemini = false;
   try {
@@ -46,8 +40,6 @@ export async function getAiConfig(): Promise<AiConfig> {
     // offline — server availability unknown
   }
   return {
-    // AI-first by default: unset → "always"
-    mode: mode === "fallback" || mode === "never" ? mode : "always",
     geminiKey: key ?? "",
     serverClaude,
     serverGemini,
@@ -55,7 +47,7 @@ export async function getAiConfig(): Promise<AiConfig> {
 }
 
 export async function setAiSetting(
-  key: "aiMode" | "geminiKey",
+  key: "geminiKey",
   value: string
 ): Promise<void> {
   await setSetting(key, value);
@@ -118,8 +110,6 @@ export async function callAi(
   lang: "en" | "hi",
   cfg: AiConfig
 ): Promise<AiCallResult | AiCallError> {
-  if (cfg.mode === "never") return "unavailable";
-
   try {
     const headers: Record<string, string> = {
       "content-type": "application/json",

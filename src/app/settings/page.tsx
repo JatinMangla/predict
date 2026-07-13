@@ -11,7 +11,6 @@ import {
   fmtCost,
   GEMINI_FREE_RPD,
   type AiConfig,
-  type AiMode,
   type UsageSummary,
 } from "@/lib/aiClient";
 
@@ -38,11 +37,6 @@ export default function SettingsPage() {
   const saveChartStyle = (s: "north" | "south") => {
     setChartStyle(s);
     void setSetting("chartStyle", s);
-  };
-
-  const saveMode = async (m: AiMode) => {
-    await setAiSetting("aiMode", m);
-    setCfg((c) => (c ? { ...c, mode: m } : c));
   };
 
   const saveKey = async () => {
@@ -169,32 +163,6 @@ export default function SettingsPage() {
               <p className="mt-1.5 text-xs text-(--color-ink-soft)">{t("quotaNote")}</p>
             </div>
           )}
-
-          {/* Mode */}
-          <div>
-            <p className="mb-2 text-sm">{t("aiMode")}</p>
-            <div className="flex flex-col gap-2">
-              {(
-                [
-                  ["always", t("aiModeAlways")],
-                  ["fallback", t("aiModeFallback")],
-                  ["never", t("aiModeNever")],
-                ] as [AiMode, string][]
-              ).map(([m, label]) => (
-                <button
-                  key={m}
-                  onClick={() => saveMode(m)}
-                  className={`rounded-md border px-4 py-2 text-left text-sm ${
-                    cfg?.mode === m
-                      ? "accent-bg border-(--accent)"
-                      : "border-(--color-line) text-(--color-ink-soft)"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
 
           {/* Free Gemini key, stored locally */}
           <div>

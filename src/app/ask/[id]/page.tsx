@@ -1,8 +1,8 @@
 "use client";
 
-// Q&A: every question is answered instantly by the offline kundli engine
-// with BOTH supportive factors and challenges. AI escalation respects the
-// user's AI mode and daily limit; usage + estimated cost stay visible.
+// Q&A: every question is answered by AI reading the full computed chart.
+// The real Gemini free-quota meter stays visible; if AI is unreachable the
+// page says so plainly (no engine-written answers).
 
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -11,7 +11,6 @@ import { useKundli } from "@/lib/useKundli";
 import { useI18n } from "@/lib/i18n";
 import { AppShell } from "@/components/AppShell";
 import { ProfileTheme } from "@/components/ProfileTheme";
-import { answerQuestion, ESCALATE_THRESHOLD } from "@/lib/interpret/qa";
 import {
   getAiConfig,
   getUsageSummary,
@@ -27,10 +26,7 @@ import { db, type QARecord } from "@/lib/db";
 interface ChatItem {
   question: string;
   answer: string;
-  source: "engine" | "ai";
-  confidence?: number;
   provider?: string;
-  lowConfidence?: boolean;
   costUsd?: number;
 }
 
@@ -71,21 +67,12 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [items]);
 
-  const canUseAi = cfg !== null && cfg.mode !== "never" && aiAvailable(cfg);
-  // Google's REAL free quota (only blocks when Claude isn't there as backup)
+  const canUseAi = cfg !== null && aiAvailable(cfg);
   const quotaExhausted =
     cfg !== null && usage !== null && usage.geminiRemaining <= 0 && !cfg.serverClaude;
 
-  const saveRecord = async (rec: Omit<QARecord, "id">) => {
-    try {
-      await db.qaHistory.add(rec);
-    } catch {
-      // history is best-effort
-    }
-  };
-
   const askAI = useCallback(
-    async (q: string, auto = false) => {
+    async (q: string) => {
       if (!kundli || !cfg || aiBusy) return;
       setAiBusy(true);
       setNotice("");
@@ -94,7 +81,7 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
       refreshUsage();
       if (typeof result === "string") {
         if (result === "quota-exhausted") setNotice(t("aiQuotaExhausted"));
-        else if (!auto) setNotice(t("aiUnavailable"));
+        else setNotice(t("aiUnavailable"));
         return;
       }
       setItems((prev) => [
@@ -102,93 +89,31 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
         {
           question: q,
           answer: result.answer,
-          source: "ai",
           provider: result.provider,
           costUsd: result.costUsd,
         },
       ]);
-      void saveRecord({
-        profileId,
-        question: q,
-        answer: result.answer,
-        source: "ai",
-        createdAt: Date.now(),
-      });
+      try {
+        await db.qaHistory.add({
+          profileId,
+          question: q,
+          answer: result.answer,
+          source: "ai",
+          createdAt: Date.now(),
+        } satisfies Omit<QARecord, "id">);
+      } catch {
+        // history is best-effort
+      }
     },
     [kundli, cfg, aiBusy, lang, t, profileId, refreshUsage]
   );
 
-  const askEngine = (q: string, escalateIfUnsure: boolean) => {
-    if (!kundli || !cfg) return;
-    const result = answerQuestion(q, kundli);
-    const answer = lang === "hi" ? result.answer.hi : result.answer.en;
-    const low = result.confidence < ESCALATE_THRESHOLD;
-    setItems((prev) => [
-      ...prev,
-      {
-        question: q,
-        answer,
-        source: "engine",
-        confidence: result.confidence,
-        lowConfidence: low,
-      },
-    ]);
-    void saveRecord({
-      profileId,
-      question: q,
-      answer,
-      source: "engine",
-      confidence: result.confidence,
-      createdAt: Date.now(),
-    });
-    if (escalateIfUnsure && low && canUseAi && navigator.onLine) {
-      void askAI(q, true);
-    }
-  };
-
-  /** AI-first: send straight to AI; only fall back to the engine if AI fails */
-  const askAiFirst = async (q: string) => {
-    if (!kundli || !cfg) return;
-    setAiBusy(true);
-    setNotice("");
-    const result = await callAi(q, kundli, lang, cfg);
-    setAiBusy(false);
-    refreshUsage();
-    if (typeof result === "string") {
-      // AI unreachable or real quota used up — engine keeps the app working
-      if (result === "quota-exhausted") setNotice(t("aiQuotaExhausted"));
-      else setNotice(t("aiUnavailable"));
-      askEngine(q, false);
-      return;
-    }
-    setItems((prev) => [
-      ...prev,
-      {
-        question: q,
-        answer: result.answer,
-        source: "ai",
-        provider: result.provider,
-        costUsd: result.costUsd,
-      },
-    ]);
-    void saveRecord({
-      profileId,
-      question: q,
-      answer: result.answer,
-      source: "ai",
-      createdAt: Date.now(),
-    });
-  };
-
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const q = question.trim();
-    if (!q) return;
+    if (!q || aiBusy) return;
     setQuestion("");
-    const aiFirst =
-      cfg?.mode === "always" && canUseAi && navigator.onLine && !quotaExhausted;
-    if (aiFirst) void askAiFirst(q);
-    else askEngine(q, cfg?.mode === "fallback");
+    void askAI(q);
   };
 
   if (loading) return <AppShell><p className="p-8 text-center text-(--color-ink-soft)">{t("loading")}</p></AppShell>;
@@ -203,8 +128,6 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
     );
   }
 
-  const lastQuestion = items.length > 0 ? items[items.length - 1].question : null;
-
   return (
     <ProfileTheme birthdayNumber={kundli.numerology.birthdayNumber}>
       <AppShell>
@@ -213,8 +136,8 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
             <h1 className="text-xl font-semibold text-(--color-gold-soft)">
               {t("askQuestion")} — {profile.name}
             </h1>
-            {/* AI usage meter — always visible so costs never surprise */}
-            {cfg && usage && cfg.mode !== "never" && (
+            {/* Real free-quota meter — costs never surprise */}
+            {usage && (
               <Link
                 href="/settings"
                 className={`rounded-full border px-3 py-1 text-xs ${
@@ -230,8 +153,7 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
             )}
           </div>
           <p className="mb-5 text-xs text-(--color-ink-soft)">
-            ✓ {t("generatedOffline")}
-            {cfg && cfg.mode !== "never" && (canUseAi ? " · AI ✓" : ` · ${t("aiNotConfigured")}`)}
+            {canUseAi ? "✨ AI" : t("aiNotConfigured")}
           </p>
 
           {notice && (
@@ -272,32 +194,17 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
                 <div className="flex justify-start">
                   <div className="card max-w-[90%] rounded-xl rounded-bl-sm px-4 py-3">
                     <div className="mb-1.5 flex flex-wrap items-center gap-2 text-xs">
-                      <span
-                        className={`rounded-full border px-2 py-0.5 ${
-                          item.source === "ai"
-                            ? "border-violet-500/40 text-violet-300"
-                            : "border-emerald-500/40 text-emerald-300"
-                        }`}
-                      >
-                        {item.source === "ai"
-                          ? `${t("aiAnswer")}${item.provider ? ` · ${item.provider}` : ""}`
-                          : t("engineAnswer")}
+                      <span className="rounded-full border border-violet-500/40 px-2 py-0.5 text-violet-300">
+                        ✨ {t("aiAnswer")}
+                        {item.provider ? ` · ${item.provider}` : ""}
                       </span>
-                      {item.confidence !== undefined && (
-                        <span className="text-(--color-ink-soft)">
-                          {t("confidence")}: {item.confidence}%
-                        </span>
-                      )}
-                      {item.source === "ai" && item.costUsd !== undefined && (
+                      {item.costUsd !== undefined && (
                         <span className="text-(--color-ink-soft)">
                           {item.costUsd === 0 ? t("free") : fmtCost(item.costUsd)}
                         </span>
                       )}
                     </div>
                     <p className="whitespace-pre-wrap text-sm leading-relaxed">{item.answer}</p>
-                    {item.lowConfidence && canUseAi && cfg?.mode === "fallback" && (
-                      <p className="mt-2 text-xs text-(--color-ink-soft)">{t("lowConfidenceNote")}</p>
-                    )}
                   </div>
                 </div>
               </div>
@@ -324,21 +231,11 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
             />
             <button
               type="submit"
-              className="rounded-xl bg-(--accent) px-5 py-3 text-sm font-medium text-[#14100a] transition hover:brightness-110"
+              disabled={aiBusy || !canUseAi}
+              className="rounded-xl bg-(--accent) px-5 py-3 text-sm font-medium text-[#14100a] transition hover:brightness-110 disabled:opacity-50"
             >
-              {t("ask")}
+              ✨ {t("ask")}
             </button>
-            {canUseAi && lastQuestion && (
-              <button
-                type="button"
-                disabled={aiBusy || quotaExhausted}
-                onClick={() => askAI(lastQuestion)}
-                className="rounded-xl border border-violet-500/40 px-4 py-3 text-sm text-violet-300 transition hover:bg-violet-500/10 disabled:opacity-50"
-                title={quotaExhausted ? t("aiQuotaExhausted") : t("askAI")}
-              >
-                ✨ {t("askAI")}
-              </button>
-            )}
           </form>
         </div>
       </AppShell>
