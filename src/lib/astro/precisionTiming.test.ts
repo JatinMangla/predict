@@ -91,7 +91,13 @@ describe("step 4 — gochara narrowing", () => {
 });
 
 describe("whole funnel", () => {
-  const f = runPrecisionFunnel(CHART, CAREER_HOUSES, [...CAREER_KARAKAS], NOW, TZ);
+  const f = runPrecisionFunnel(
+    CHART,
+    CAREER_HOUSES,
+    [...CAREER_KARAKAS],
+    { kind: "monthly", fromMs: NOW, days: 30 },
+    TZ
+  );
 
   it("produces all five steps", () => {
     expect(f.step1.confidence).toBeTruthy();
@@ -113,6 +119,57 @@ describe("whole funnel", () => {
       expect(w.houseFromLagna).toBeLessThanOrEqual(12);
       expect(w.houseFromChandra).toBeGreaterThanOrEqual(1);
       expect(w.houseFromChandra).toBeLessThanOrEqual(12);
+    }
+  });
+});
+
+describe("scoped funnel (daily / weekly / monthly / yearly)", () => {
+  const run = (kind: "daily" | "weekly" | "monthly" | "yearly", days: number) =>
+    runPrecisionFunnel(
+      CHART,
+      CAREER_HOUSES,
+      [...CAREER_KARAKAS],
+      { kind, fromMs: NOW, days },
+      TZ
+    );
+
+  it("daily returns exactly the chosen day", () => {
+    const f = run("daily", 1);
+    expect(f.scope.kind).toBe("daily");
+    expect(f.step5.length).toBe(1);
+    expect(f.step5[0].dayStartMs).toBeGreaterThanOrEqual(NOW - 86400000);
+  });
+
+  it("weekly returns the seven days of the week in order", () => {
+    const f = run("weekly", 7);
+    expect(f.step5.length).toBe(7);
+    for (let i = 1; i < f.step5.length; i++) {
+      expect(f.step5[i].dayStartMs).toBeGreaterThan(f.step5[i - 1].dayStartMs);
+    }
+  });
+
+  it("short scopes expose the pratyantardasha level", () => {
+    const f = run("weekly", 7);
+    expect(f.step3.length).toBeGreaterThan(0);
+    expect(f.step3.some((w) => w.pratyantarLord !== undefined)).toBe(true);
+  });
+
+  it("long scopes stay at the antardasha level", () => {
+    const f = run("yearly", 365);
+    expect(f.step3.every((w) => w.pratyantarLord === undefined)).toBe(true);
+  });
+
+  it("every scope keeps step 4 inside its own window", () => {
+    for (const [kind, days] of [
+      ["daily", 1],
+      ["weekly", 7],
+      ["monthly", 30],
+    ] as const) {
+      const f = run(kind, days);
+      for (const w of f.step4) {
+        expect(w.startMs).toBeGreaterThanOrEqual(NOW);
+        expect(w.startMs).toBeLessThanOrEqual(NOW + days * 86400000 + 86400000);
+      }
     }
   });
 });

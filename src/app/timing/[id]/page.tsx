@@ -12,7 +12,11 @@ import { useI18n } from "@/lib/i18n";
 import { AppShell } from "@/components/AppShell";
 import { ProfileTheme } from "@/components/ProfileTheme";
 import { CATEGORIES, type CategoryDef } from "@/lib/interpret/categories";
-import { runPrecisionFunnel, type PrecisionFunnel } from "@/lib/astro/precisionTiming";
+import {
+  runPrecisionFunnel,
+  type PrecisionFunnel,
+  type ScopeKind,
+} from "@/lib/astro/precisionTiming";
 import {
   getAiConfig,
   getUsageSummary,
@@ -25,11 +29,35 @@ import {
 } from "@/lib/aiClient";
 import { fmtDate, fmtTime, planetName } from "@/lib/format";
 
+const DAY_MS = 86400 * 1000;
+
+/** yyyy-mm-dd for a local date */
+function isoDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function dayStart(iso: string): number {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).getTime();
+}
+function weekStart(ms: number): number {
+  const d = new Date(ms);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime() - ((d.getDay() + 6) % 7) * DAY_MS;
+}
+function todayStart(): number {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
 export default function TimingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { profile, kundli, loading, error } = useKundli(Number(id));
   const { t, lang } = useI18n();
   const [category, setCategory] = useState<CategoryDef | null>(null);
+  const [scopeKind, setScopeKind] = useState<ScopeKind>("monthly");
+  const [pickedDate, setPickedDate] = useState(() => isoDate(new Date()));
+  const [weekAnchor, setWeekAnchor] = useState(() => weekStart(Date.now()));
   const [cfg, setCfg] = useState<AiConfig | null>(null);
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [reading, setReading] = useState<{ text: string; provider: string; costUsd: number } | null>(null);
@@ -41,16 +69,23 @@ export default function TimingPage({ params }: { params: Promise<{ id: string }>
     getUsageSummary().then(setUsage);
   }, []);
 
+  const scope = useMemo(() => {
+    if (scopeKind === "daily") return { kind: scopeKind, fromMs: dayStart(pickedDate), days: 1 };
+    if (scopeKind === "weekly") return { kind: scopeKind, fromMs: weekAnchor, days: 7 };
+    if (scopeKind === "monthly") return { kind: scopeKind, fromMs: todayStart(), days: 30 };
+    return { kind: scopeKind, fromMs: todayStart(), days: 365 };
+  }, [scopeKind, pickedDate, weekAnchor]);
+
   const funnel: PrecisionFunnel | null = useMemo(() => {
     if (!kundli || !category) return null;
     return runPrecisionFunnel(
       kundli,
       category.houses,
       category.karakas,
-      Date.now(),
+      scope,
       new Date().getTimezoneOffset()
     );
-  }, [kundli, category]);
+  }, [kundli, category, scope]);
 
   const canUseAi = cfg !== null && aiAvailable(cfg);
   const quotaExhausted =
@@ -71,15 +106,23 @@ export default function TimingPage({ params }: { params: Promise<{ id: string }>
       .map((w) => `${new Date(w.dayStartMs + 43200000).toISOString().slice(0, 10)} score ${w.score}/100, act ${w.bestFrom ? fmtTime(w.bestFrom, "en") : "?"}-${w.bestTo ? fmtTime(w.bestTo, "en") : "?"}, avoid ${w.avoidFrom ? fmtTime(w.avoidFrom, "en") : "?"}-${w.avoidTo ? fmtTime(w.avoidTo, "en") : "?"}`)
       .join("\n");
 
+    const scopeLabel = {
+      daily: `the single day ${pickedDate}`,
+      weekly: `the week of ${isoDate(new Date(weekAnchor))}`,
+      monthly: "the next 30 days",
+      yearly: "the next 12 months",
+    }[scopeKind];
+
     const question =
       `Life area: ${category.label.en} (${category.scope.en}).\n` +
-      `I have already run the classical five-step precision funnel on this chart. Read it as a whole and give the final verdict.\n\n` +
+      `Timeframe under examination: ${scopeLabel}.\n` +
+      `I have already run the classical five-step precision funnel on this chart for that timeframe. Read it as a whole and give the final verdict.\n\n` +
       `STEP 1 — Birth-time confidence: lagna stable ${f.step1.lagnaMinutesBefore}min before / ${f.step1.lagnaMinutesAfter}min after the stated time; navamsa lagna stable only ${f.step1.navamsaMinutesBefore}/${f.step1.navamsaMinutesAfter}min (confidence: ${f.step1.confidence}).\n\n` +
       `STEP 2 — Natal promise: ${f.step2.score}/100 (${f.step2.verdict}).\nSupports: ${f.step2.supports.join("; ") || "none"}\nBlocks: ${f.step2.blocks.join("; ") || "none"}\n\n` +
       `STEP 3 — Dasha windows:\n${dashaLines || "none relevant"}\n\n` +
       `STEP 4 — Gochara windows:\n${gocharaLines || "none"}\n\n` +
       `STEP 5 — Muhurta candidates:\n${muhurtaLines || "none"}\n\n` +
-      `Answer: (a) does the chart promise this at all and how strongly, (b) the single best 2-3 year window and why, (c) the best 15-30 day stretch inside it, (d) the exact date and clock window to act, (e) what to avoid and any precaution. Use the supplied dates and times exactly.`;
+      `Answer for ${scopeLabel}: (a) does the chart promise this at all and how strongly, (b) which running period drives it and why, (c) the strongest stretch inside the timeframe, (d) the exact date and clock window to act, (e) what to avoid and any precaution. Use the supplied dates and times exactly.`;
 
     const result = await callAi(question, kundli, lang, cfg, "schedule");
     setBusy(false);
@@ -89,7 +132,7 @@ export default function TimingPage({ params }: { params: Promise<{ id: string }>
       return;
     }
     setReading({ text: result.answer, provider: result.provider, costUsd: result.costUsd });
-  }, [kundli, cfg, category, funnel, busy, lang, t]);
+  }, [kundli, cfg, category, funnel, busy, lang, t, scopeKind, pickedDate, weekAnchor]);
 
   if (loading) return <AppShell><p className="p-8 text-center text-(--color-ink-soft)">{t("loading")}</p></AppShell>;
   if (error || !kundli || !profile) {
@@ -148,6 +191,73 @@ export default function TimingPage({ params }: { params: Promise<{ id: string }>
               >
                 ✨ {usage.geminiRemaining}/{GEMINI_FREE_RPD} {t("freeCallsLeft")}
               </Link>
+            )}
+          </div>
+
+          {/* Timeframe + date/week pickers */}
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <div className="flex gap-1 rounded-lg border border-(--color-line) p-1 text-sm">
+              {(["daily", "weekly", "monthly", "yearly"] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => {
+                    setScopeKind(s);
+                    setReading(null);
+                  }}
+                  className={`rounded-md px-3 py-1.5 transition ${
+                    scopeKind === s ? "accent-bg accent-text font-medium" : "text-(--color-ink-soft)"
+                  }`}
+                >
+                  {t(s)}
+                </button>
+              ))}
+            </div>
+
+            {scopeKind === "daily" && (
+              <input
+                type="date"
+                value={pickedDate}
+                onChange={(e) => {
+                  setPickedDate(e.target.value);
+                  setReading(null);
+                }}
+                className="rounded-lg border border-(--color-line) bg-(--color-surface) px-3 py-2 text-sm outline-none focus:border-(--accent)"
+              />
+            )}
+
+            {scopeKind === "weekly" && (
+              <div className="flex items-center gap-1 rounded-lg border border-(--color-line) p-1 text-sm">
+                <button
+                  onClick={() => {
+                    setWeekAnchor((w) => w - 7 * DAY_MS);
+                    setReading(null);
+                  }}
+                  className="rounded-md px-2 py-1 text-(--color-ink-soft) hover:text-(--color-ink)"
+                >
+                  ←
+                </button>
+                <span className="px-2 text-xs">
+                  {fmtDate(weekAnchor + 43200000, lang)} – {fmtDate(weekAnchor + 6 * DAY_MS + 43200000, lang)}
+                </span>
+                <button
+                  onClick={() => {
+                    setWeekAnchor((w) => w + 7 * DAY_MS);
+                    setReading(null);
+                  }}
+                  className="rounded-md px-2 py-1 text-(--color-ink-soft) hover:text-(--color-ink)"
+                >
+                  →
+                </button>
+                <button
+                  onClick={() => {
+                    setWeekAnchor(weekStart(Date.now()));
+                    setReading(null);
+                  }}
+                  className="rounded-md px-2 py-1 text-xs accent-text"
+                >
+                  {t("todayLabel")}
+                </button>
+              </div>
             )}
           </div>
 
@@ -247,7 +357,15 @@ export default function TimingPage({ params }: { params: Promise<{ id: string }>
               </Step>
 
               {/* Step 3 — dasha */}
-              <Step n={3} title={t("step3Title")} subtitle={t("step3Sub")}>
+              <Step
+                n={3}
+                title={t("step3Title")}
+                subtitle={
+                  scopeKind === "daily" || scopeKind === "weekly"
+                    ? t("step3SubShort")
+                    : t("step3Sub")
+                }
+              >
                 <div className="space-y-2">
                   {funnel.step3.length === 0 ? (
                     <p className="text-sm text-(--color-ink-soft)">—</p>
@@ -257,6 +375,7 @@ export default function TimingPage({ params }: { params: Promise<{ id: string }>
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="text-sm font-medium">
                             {planetName(w.mahaLord, lang)} – {planetName(w.antarLord, lang)}
+                            {w.pratyantarLord && ` – ${planetName(w.pratyantarLord, lang)}`}
                           </span>
                           <span className="text-xs accent-text">{w.relevance}/100</span>
                         </div>
@@ -271,7 +390,15 @@ export default function TimingPage({ params }: { params: Promise<{ id: string }>
               </Step>
 
               {/* Step 4 — gochara */}
-              <Step n={4} title={t("step4Title")} subtitle={t("step4Sub")}>
+              <Step
+                n={4}
+                title={t("step4Title")}
+                subtitle={
+                  scopeKind === "daily" || scopeKind === "weekly"
+                    ? t("step4SubShort")
+                    : t("step4Sub")
+                }
+              >
                 <div className="space-y-2">
                   {funnel.step4.length === 0 ? (
                     <p className="text-sm text-(--color-ink-soft)">{t("noGocharaWindow")}</p>

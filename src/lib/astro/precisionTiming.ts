@@ -18,7 +18,11 @@ import { vargaSign } from "./vargas";
 import { activeDashas } from "./dasha";
 import { strengthScore } from "./strength";
 import { rulesHouses, judgeTransit, binduFor } from "./chartJudgement";
-import { personalDayWindows, bestDays, type FavourableWindow } from "./favourableWindows";
+import {
+  personalDayWindows,
+  bestDays,
+  type FavourableWindow,
+} from "./favourableWindows";
 
 const MIN_MS = 60 * 1000;
 const DAY_MS = 86400 * 1000;
@@ -191,11 +195,105 @@ export function natalPromise(
 export interface DashaWindow {
   mahaLord: PlanetId;
   antarLord: PlanetId;
+  /** present for short scopes, where this is the level that actually moves */
+  pratyantarLord?: PlanetId;
   startMs: number;
   endMs: number;
   /** 0–100 relevance of this period to the asked houses */
   relevance: number;
   reasons: string[];
+}
+
+/** Relevance of a dasha lord to the asked houses, from THIS chart */
+function lordRelevance(
+  kundli: Kundli,
+  lord: PlanetId,
+  houses: number[],
+  karakas: PlanetId[]
+): { score: number; reasons: string[] } {
+  const reasons: string[] = [];
+  let score = 0;
+  const rules = rulesHouses(kundli.lagna.sign, lord).filter((h) => houses.includes(h));
+  if (rules.length) {
+    score += 45;
+    reasons.push(`rules H${rules.join("/")}`);
+  }
+  const pos = kundli.planets.find((p) => p.id === lord)!;
+  if (houses.includes(pos.house)) {
+    score += 30;
+    reasons.push(`sits in H${pos.house}`);
+  }
+  if (karakas.includes(lord)) {
+    score += 25;
+    reasons.push("natural karaka");
+  }
+  const st = strengthScore({
+    dignity: pos.dignity,
+    combust: pos.combust,
+    retrograde: pos.retrograde,
+    house: pos.house,
+    planet: pos.id,
+  });
+  score += Math.round((st - 50) / 4);
+  if (st >= 60) reasons.push(`strong (${pos.dignity})`);
+  if (st <= 40) reasons.push(`weak (${pos.dignity})`);
+  return { score: Math.max(0, Math.min(100, score)), reasons };
+}
+
+/**
+ * Dasha periods overlapping a date range. For short ranges the
+ * pratyantardasha level is included, since that is what actually changes
+ * within a week or a month.
+ */
+export function dashaWindowsInRange(
+  kundli: Kundli,
+  houses: number[],
+  karakas: PlanetId[],
+  fromMs: number,
+  toMs: number,
+  includePratyantar: boolean
+): DashaWindow[] {
+  const out: DashaWindow[] = [];
+  for (const md of kundli.dasha) {
+    if (md.end < fromMs || md.start > toMs || !md.children) continue;
+    for (const ad of md.children) {
+      if (ad.end < fromMs || ad.start > toMs) continue;
+      const m = lordRelevance(kundli, md.lord, houses, karakas);
+      const a = lordRelevance(kundli, ad.lord, houses, karakas);
+
+      if (includePratyantar && ad.children) {
+        for (const pd of ad.children) {
+          if (pd.end < fromMs || pd.start > toMs) continue;
+          const p = lordRelevance(kundli, pd.lord, houses, karakas);
+          out.push({
+            mahaLord: md.lord,
+            antarLord: ad.lord,
+            pratyantarLord: pd.lord,
+            startMs: Math.max(pd.start, fromMs),
+            endMs: Math.min(pd.end, toMs),
+            relevance: Math.round(m.score * 0.25 + a.score * 0.35 + p.score * 0.4),
+            reasons: [
+              ...a.reasons.map((r) => `${ad.lord} (AD) ${r}`),
+              ...p.reasons.map((r) => `${pd.lord} (PD) ${r}`),
+            ].slice(0, 4),
+          });
+        }
+      } else {
+        out.push({
+          mahaLord: md.lord,
+          antarLord: ad.lord,
+          startMs: Math.max(ad.start, fromMs),
+          endMs: Math.min(ad.end, toMs),
+          relevance: Math.round(m.score * 0.45 + a.score * 0.55),
+          reasons: [
+            ...m.reasons.map((r) => `${md.lord} (MD) ${r}`),
+            ...a.reasons.map((r) => `${ad.lord} (AD) ${r}`),
+          ].slice(0, 4),
+        });
+      }
+    }
+  }
+  return out.sort((a, b) => a.startMs - b.startMs).slice(0, 8);
 }
 
 export function dashaWindows(
@@ -300,13 +398,16 @@ export function gocharaWindows(
   kundli: Kundli,
   houses: number[],
   fromMs: number,
-  toMs: number
+  toMs: number,
+  /** which grahas to scan — fast movers matter for short scopes */
+  planets: PlanetId[] = ["Jupiter", "Saturn"],
+  stepMs = 5 * DAY_MS
 ): GocharaWindow[] {
   const out: GocharaWindow[] = [];
-  const step = 5 * DAY_MS;
+  const step = stepMs;
   const span = Math.min(toMs - fromMs, 3 * YEAR_MS);
 
-  for (const planet of ["Jupiter", "Saturn"] as PlanetId[]) {
+  for (const planet of planets) {
     let openFrom: number | null = null;
     let openInfo: { house: number; sign: number } | null = null;
 
@@ -375,7 +476,17 @@ export function muhurtaPicks(
 
 // ── Whole funnel ────────────────────────────────────────────────────
 
+export type ScopeKind = "daily" | "weekly" | "monthly" | "yearly";
+
+export interface TimeScope {
+  kind: ScopeKind;
+  /** local-midnight ms of the first day in scope */
+  fromMs: number;
+  days: number;
+}
+
 export interface PrecisionFunnel {
+  scope: TimeScope;
   step1: BirthTimeConfidence;
   step2: NatalPromise;
   step3: DashaWindow[];
@@ -383,32 +494,64 @@ export interface PrecisionFunnel {
   step5: FavourableWindow[];
 }
 
+/** Which grahas to watch, and how finely, for each scope */
+const SCOPE_GOCHARA: Record<ScopeKind, { planets: PlanetId[]; stepMs: number }> = {
+  // within a day or a week the Moon and the fast planets are what move
+  daily: {
+    planets: ["Moon", "Mercury", "Venus", "Sun", "Mars", "Jupiter", "Saturn"],
+    stepMs: 2 * 3600 * 1000,
+  },
+  weekly: {
+    planets: ["Moon", "Mercury", "Venus", "Sun", "Mars", "Jupiter", "Saturn"],
+    stepMs: 6 * 3600 * 1000,
+  },
+  monthly: {
+    planets: ["Sun", "Mercury", "Venus", "Mars", "Jupiter", "Saturn"],
+    stepMs: DAY_MS,
+  },
+  yearly: { planets: ["Jupiter", "Saturn", "Rahu"], stepMs: 5 * DAY_MS },
+};
+
 export function runPrecisionFunnel(
   kundli: Kundli,
   houses: number[],
   karakas: PlanetId[],
-  nowMs: number,
+  scope: TimeScope,
   tzOffsetMinutes: number
 ): PrecisionFunnel {
+  const fromMs = scope.fromMs;
+  const toMs = fromMs + scope.days * DAY_MS;
+
   const step1 = birthTimeConfidence(kundli);
   const step2 = natalPromise(kundli, houses, karakas);
-  const step3 = dashaWindows(kundli, houses, karakas, nowMs, 5);
 
-  // Narrow inside the soonest strongly-relevant dasha window
-  const lead = [...step3].sort((a, b) => a.startMs - b.startMs)[0];
-  const gFrom = lead ? Math.max(lead.startMs, nowMs) : nowMs;
-  const gTo = lead ? lead.endMs : nowMs + 2 * YEAR_MS;
-  const step4 = gocharaWindows(kundli, houses, gFrom, gTo);
+  // Step 3 — dashas actually running in the chosen window. Short scopes get
+  // the pratyantardasha, which is the level that changes within days.
+  const shortScope = scope.kind === "daily" || scope.kind === "weekly";
+  let step3 = dashaWindowsInRange(kundli, houses, karakas, fromMs, toMs, shortScope);
+  // For a long view also surface the strongest upcoming periods
+  if (scope.kind === "yearly" && step3.length < 3) {
+    step3 = [...step3, ...dashaWindows(kundli, houses, karakas, fromMs, 3)]
+      .filter((w, i, arr) => arr.findIndex((x) => x.startMs === w.startMs) === i)
+      .sort((a, b) => a.startMs - b.startMs)
+      .slice(0, 8);
+  }
 
-  // Exact days inside the soonest gochara window (or from today)
-  const soonest = step4.find((w) => w.endMs > nowMs);
-  const mFrom = soonest ? Math.max(soonest.startMs, nowMs) : nowMs;
-  const mDays = soonest
-    ? Math.max(7, Math.min(45, Math.round((soonest.endMs - mFrom) / DAY_MS)))
-    : 30;
-  const step5 = muhurtaPicks(kundli, houses, karakas, mFrom, mDays, tzOffsetMinutes, 5);
+  // Step 4 — transits inside the same window, at a resolution that suits it
+  const g = SCOPE_GOCHARA[scope.kind];
+  const step4 = gocharaWindows(kundli, houses, fromMs, toMs, g.planets, g.stepMs);
 
-  return { step1, step2, step3, step4, step5 };
+  // Step 5 — exact days and clock windows inside the scope
+  const picks = scope.kind === "daily" ? 1 : scope.kind === "weekly" ? 7 : scope.kind === "monthly" ? 6 : 10;
+  const step5 =
+    scope.kind === "daily" || scope.kind === "weekly"
+      ? personalDayWindows(kundli, houses, karakas, fromMs, scope.days, tzOffsetMinutes).slice(
+          0,
+          scope.days
+        )
+      : muhurtaPicks(kundli, houses, karakas, fromMs, scope.days, tzOffsetMinutes, picks);
+
+  return { scope, step1, step2, step3, step4, step5 };
 }
 
 export { birthToUtcMs };
