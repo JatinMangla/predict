@@ -109,8 +109,8 @@ export async function callAi(
   kundli: Kundli,
   lang: "en" | "hi",
   cfg: AiConfig,
-  /** "rashi" = general Moon-sign forecast + personal verification */
-  mode: "standard" | "rashi" = "standard"
+  /** "rashi" = personal life-area reading; "verify" = test a pasted forecast */
+  mode: "standard" | "rashi" | "verify" = "standard"
 ): Promise<AiCallResult | AiCallError> {
   try {
     const headers: Record<string, string> = {
