@@ -108,7 +108,9 @@ export async function callAi(
   question: string,
   kundli: Kundli,
   lang: "en" | "hi",
-  cfg: AiConfig
+  cfg: AiConfig,
+  /** "rashi" = general Moon-sign forecast + personal verification */
+  mode: "standard" | "rashi" = "standard"
 ): Promise<AiCallResult | AiCallError> {
   try {
     const headers: Record<string, string> = {
@@ -122,6 +124,7 @@ export async function callAi(
       body: JSON.stringify({
         question,
         lang,
+        mode,
         kundli: buildKundliSummary(kundli),
       }),
     });

@@ -14,6 +14,8 @@ export const maxDuration = 60;
 const BodySchema = z.object({
   question: z.string().min(3).max(600),
   lang: z.enum(["en", "hi"]),
+  /** "rashi" = general Moon-sign principle first, then personal verification */
+  mode: z.enum(["standard", "rashi"]).optional(),
   /** Full kundli context produced client-side — no account data */
   kundli: z
     .object({
@@ -110,6 +112,35 @@ function buildPrompt(body: z.infer<typeof BodySchema>): string {
     .join("\n");
 }
 
+/**
+ * Rashi mode: the method Moon-sign forecasters use — state the general
+ * principle for the sign, then check point-by-point which parts actually
+ * hold for THIS chart. Every generic claim must be marked applies /
+ * modified / does-not-apply with the deciding placement named.
+ */
+const RASHI_SYSTEM_PROMPT = (lang: "en" | "hi") =>
+  [
+    "You are a master Vedic astrologer (Jyotish) doing a two-layer reading, the way a professional Moon-sign forecaster works: first the general rule for the rashi, then the personal verification.",
+    "You are given the native's COMPLETE chart: D1 with degrees and nakshatras, every house lord's placement, D9, D10, sarvashtakavarga, running and upcoming dashas, and today's transits.",
+    "",
+    "WRITE EXACTLY THESE THREE SECTIONS:",
+    "",
+    "**1. General forecast for this Moon sign (rashi)** — 3-5 short bullets giving the standard prediction for the asked life area for anyone with this Moon sign right now, based purely on the current gochar of Jupiter, Saturn, Rahu/Ketu and the Sun relative to that Moon sign. This is the 'common for everyone of this rashi' layer. Speak in the confident, direct voice of a traditional forecaster.",
+    "",
+    "**2. How much of this applies to YOU** — take EACH bullet from section 1 in order and verify it against this specific chart. Mark each one:",
+    "   ✅ APPLIES — and name the placement that confirms it (house lord, its dignity, dasha, ashtakavarga bindus, varga position).",
+    "   ⚠️ MODIFIED — state exactly how it changes for this native and which placement changes it.",
+    "   ❌ DOES NOT APPLY — state which placement cancels or overrides the general rule.",
+    "   Be specific and technical: name planets, houses, signs, dignities, dashas and dates. This section is the whole point — never skip or generalise it.",
+    "",
+    "**3. Your personal verdict & timing** — what actually happens for THIS native in the asked area: the real outlook, the exact dasha/transit windows (with dates from the data) when it materialises or worsens, the precautions, and at most two classical non-commercial remedies.",
+    "",
+    "RULES: total 350-500 words, bullets not paragraphs. Cite only placements present in the given data — never invent. Be completely honest: if the general rashi forecast is positive but this chart contradicts it, say so plainly, and vice versa. Never soften an adverse indication.",
+    lang === "hi"
+      ? "पूरा उत्तर हिंदी में लिखें। शीर्षक: 1. राशि का सामान्य फल, 2. आपकी कुंडली पर कितना लागू, 3. आपका व्यक्तिगत निष्कर्ष व समय।"
+      : "Answer in English.",
+  ].join("\n");
+
 const SYSTEM_PROMPT = (lang: "en" | "hi") =>
   [
     "You are a master Vedic astrologer (Jyotish) trained in classical Parashari methods: bhava significations, house lordships, planetary dignities and avasthas, yogas, Vimshottari dasha interpretation, divisional charts (D9 navamsa, D10 dasamsa), ashtakavarga and gochar transits.",
@@ -130,6 +161,12 @@ const SYSTEM_PROMPT = (lang: "en" | "hi") =>
       ? "पूरा उत्तर हिंदी में लिखें। अनुभाग शीर्षक: प्रत्यक्ष उत्तर, कुंडली क्या दर्शाती है, समय, अनुकूल पक्ष, चुनौतियाँ, निष्कर्ष व मार्गदर्शन।"
       : "Answer in English.",
   ].join("\n");
+
+function systemFor(body: z.infer<typeof BodySchema>): string {
+  return body.mode === "rashi"
+    ? RASHI_SYSTEM_PROMPT(body.lang)
+    : SYSTEM_PROMPT(body.lang);
+}
 
 export interface AiUsage {
   inputTokens: number;
@@ -152,7 +189,7 @@ async function askClaude(
       model: "claude-opus-4-8",
       max_tokens: 8000,
       thinking: { type: "adaptive" },
-      system: SYSTEM_PROMPT(body.lang),
+      system: systemFor(body),
       messages: [{ role: "user", content: buildPrompt(body) }],
     });
     if (response.stop_reason === "refusal") return null;
@@ -195,7 +232,7 @@ async function askGemini(
         },
         body: JSON.stringify({
           system_instruction: {
-            parts: [{ text: SYSTEM_PROMPT(body.lang) }],
+            parts: [{ text: systemFor(body) }],
           },
           contents: [{ parts: [{ text: buildPrompt(body) }] }],
           generationConfig: {

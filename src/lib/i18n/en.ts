@@ -152,6 +152,12 @@ export const en = {
   tarabala: "Tarabala (star strength)",
   chandrabala: "Chandra Bala (moon strength)",
   aiInsight: "AI Insight",
+  rashiDeepDive: "Rashi Deep-Dive",
+  rashiNav: "Rashi Reading",
+  rashiDeepDiveNote:
+    "Pick a life area: you get the general forecast for your Moon sign first (what applies to everyone of this rashi), then a point-by-point check of which parts actually hold for YOUR chart — ✅ applies, ⚠️ modified, ❌ doesn't apply.",
+  pickCategoryHint: "Pick a life area above to get your reading",
+  houses: "Houses",
   getAiInsight: "✨ Get AI insight",
   supportiveFactors: "Supportive factors",
   challengesLabel: "Challenges",

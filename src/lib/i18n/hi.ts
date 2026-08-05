@@ -154,6 +154,12 @@ export const hi: Dict = {
   tarabala: "ताराबल",
   chandrabala: "चंद्रबल",
   aiInsight: "AI विश्लेषण",
+  rashiDeepDive: "राशि विश्लेषण",
+  rashiNav: "राशिफल",
+  rashiDeepDiveNote:
+    "जीवन क्षेत्र चुनें: पहले आपकी चंद्र राशि का सामान्य फल (जो इस राशि के सभी लोगों पर लागू होता है), फिर बिंदुवार जाँच कि उसमें से कितना आपकी कुंडली पर वास्तव में लागू होता है — ✅ लागू, ⚠️ परिवर्तित, ❌ लागू नहीं।",
+  pickCategoryHint: "अपना फल जानने के लिए ऊपर से जीवन क्षेत्र चुनें",
+  houses: "भाव",
   getAiInsight: "✨ AI विश्लेषण प्राप्त करें",
   supportiveFactors: "अनुकूल पक्ष",
   challengesLabel: "चुनौतियाँ",

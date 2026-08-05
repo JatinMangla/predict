@@ -81,6 +81,9 @@ export default function DashboardPage() {
                     <Link href={`/kundli/${p.id}`} className="accent-bg rounded-md px-3 py-1.5 transition hover:brightness-125">
                       {t("kundli")}
                     </Link>
+                    <Link href={`/rashi/${p.id}`} className="rounded-md border border-(--color-line) px-3 py-1.5 text-(--color-ink-soft) transition hover:text-(--color-ink)">
+                      {t("rashiNav")}
+                    </Link>
                     <Link href={`/predictions/${p.id}`} className="rounded-md border border-(--color-line) px-3 py-1.5 text-(--color-ink-soft) transition hover:text-(--color-ink)">
                       {t("predictions")}
                     </Link>
