@@ -94,6 +94,7 @@ export default function KundliPage({ params }: { params: Promise<{ id: string }>
           </div>
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
             <Link href={`/rashi/${id}`} className="accent-bg rounded-md px-3 py-1.5">{t("rashiNav")}</Link>
+            <Link href={`/timing/${id}`} className="accent-bg rounded-md px-3 py-1.5">🎯 {t("timingNav")}</Link>
             <Link href={`/transits/${id}`} className="accent-bg rounded-md px-3 py-1.5">{t("transits")}</Link>
             <Link href={`/ask/${id}`} className="accent-bg rounded-md px-3 py-1.5">{t("askQuestion")}</Link>
             <Link href={`/calendar/${id}`} className="accent-bg rounded-md px-3 py-1.5">{t("calendarNav")}</Link>
