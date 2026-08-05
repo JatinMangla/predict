@@ -110,7 +110,7 @@ export async function callAi(
   lang: "en" | "hi",
   cfg: AiConfig,
   /** "rashi" = personal life-area reading; "verify" = test a pasted forecast */
-  mode: "standard" | "rashi" | "verify" = "standard"
+  mode: "standard" | "rashi" | "verify" | "schedule" = "standard"
 ): Promise<AiCallResult | AiCallError> {
   try {
     const headers: Record<string, string> = {

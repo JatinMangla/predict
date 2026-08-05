@@ -167,6 +167,13 @@ export const en = {
   datesNote:
     "Dates are scored from your birth star (Tarabala), the Moon's position from your natal Moon (Chandra Bala) and the weekday ruler for this area. The green time is Abhijit Muhurat — the best window to act; the red time is Rahu Kaal — avoid starting anything then.",
   personalReading: "Your personal reading",
+  timeWisePlan: "Your date & time action plan",
+  planetPeriods: "Planet positions — from / till & current effect",
+  stayFrom: "Entered",
+  stayTill: "Stays till",
+  fromLagna: "from lagna",
+  planetPeriodsNote:
+    "Each planet's current sign with the exact moment it entered and when it leaves. Chips show what it is activating in your chart right now.",
   verifyForecast: "Check any forecast against your chart",
   verifyForecastNote:
     "Heard a prediction for your Moon sign (YouTube, TV, an app)? Paste it here. Every claim is tested against YOUR chart: what your chart supports is kept, what it contradicts is discarded — and where they conflict, your chart decides.",
