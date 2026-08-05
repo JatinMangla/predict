@@ -22,7 +22,6 @@ import {
   type FavourableWindow,
 } from "@/lib/astro/favourableWindows";
 import { currentTransitPeriod } from "@/lib/astro/planetPeriods";
-import { FAVOURABLE_FROM_MOON } from "@/lib/astro/transits";
 import {
   HOUSE_KEYWORDS,
   PLANET_TONE_KEYWORDS,
@@ -131,9 +130,9 @@ export default function RashiPage({ params }: { params: Promise<{ id: string }> 
       ids.add(SIGN_LORDS[(kundli.lagna.sign + h - 1) % 12]);
     }
     return [...ids].map((pid) => {
-      const tp = currentTransitPeriod(pid, moon.sign, kundli.lagna.sign);
-      const good = FAVOURABLE_FROM_MOON[pid].includes(tp.houseFromMoon);
-      const hk = HOUSE_KEYWORDS[tp.houseFromLagna - 1];
+      const tp = currentTransitPeriod(pid, kundli);
+      const good = tp.judgement.favourable;
+      const hk = HOUSE_KEYWORDS[tp.judgement.houseFromLagna - 1];
       const tone = PLANET_TONE_KEYWORDS[pid][good ? "good" : "bad"];
       return {
         ...tp,
@@ -158,7 +157,14 @@ export default function RashiPage({ params }: { params: Promise<{ id: string }> 
     } else if (period === "yearly") {
       days = 365;
     }
-    const list = personalDayWindows(kundli, category.karakas, from, days, tz).slice(
+    const list = personalDayWindows(
+      kundli,
+      category.houses,
+      category.karakas,
+      from,
+      days,
+      tz
+    ).slice(
       0,
       period === "daily" ? 1 : period === "weekly" ? 7 : undefined
     );
@@ -193,7 +199,7 @@ export default function RashiPage({ params }: { params: Promise<{ id: string }> 
             w.avoidFrom !== undefined
               ? `${fmtTime(w.avoidFrom, "en")}-${fmtTime(w.avoidTo!, "en")}`
               : "n/a";
-          return `${day} | score ${w.score}/100 (${w.rating}) | tara ${w.taraName.en} | Moon ${w.chandraHouse}th from natal Moon | best window ${best} | blocked window ${avoid}${w.festivals.length ? ` | festival: ${w.festivals[0].en}` : ""}`;
+          return `${day} | score ${w.score}/100 (${w.rating}) | tara ${w.taraName.en} | Moon transits YOUR ${w.moonHouseFromLagna}th house from lagna${w.moonBindus !== null ? ` (${w.moonBindus} bindus)` : ""} | running dasha lord ${w.dashaLord ?? "?"}${w.dashaSupports ? " (activates this area)" : ""} | best window ${best} | blocked window ${avoid}${w.festivals.length ? ` | festival: ${w.festivals[0].en}` : ""}`;
         })
         .join("\n"),
     []
@@ -281,7 +287,8 @@ export default function RashiPage({ params }: { params: Promise<{ id: string }> 
       <div>
         <span className="font-medium">{fmtDate(w.dayStartMs + 43200000, lang)}</span>
         <span className="ml-2 text-xs text-(--color-ink-soft)">
-          {lang === "hi" ? w.taraName.hi : w.taraName.en} · {t("chandraOfDay")} {w.chandraHouse}
+          {lang === "hi" ? w.taraName.hi : w.taraName.en} · {t("yourHouse")} {w.moonHouseFromLagna}
+          {w.dashaSupports && w.dashaLord ? ` · ${planetName(w.dashaLord, lang)} ✓` : ""}
           {w.varaMatch ? ` · ${planetName(w.varaLord, lang)}` : ""}
         </span>
         {w.festivals.length > 0 && (
@@ -316,8 +323,11 @@ export default function RashiPage({ params }: { params: Promise<{ id: string }> 
                 {t("rashiDeepDive")} — {profile.name}
               </h1>
               <p className="mt-0.5 text-sm text-(--color-ink-soft)">
-                {t("moonSign")}: <span className="accent-text font-medium">{rashiName}</span> ·{" "}
-                {t("birthNakshatra")}:{" "}
+                {t("ascendant")}:{" "}
+                <span className="accent-text font-medium">
+                  {signName(kundli.lagna.sign, lang)} {fmtDegInSign(kundli.lagna.degInSign)}
+                </span>{" "}
+                · {t("moonSign")}: {rashiName} · {t("birthNakshatra")}:{" "}
                 {lang === "hi" ? NAKSHATRA_NAMES[moon.nakshatra].hi : NAKSHATRA_NAMES[moon.nakshatra].en}
               </p>
             </div>
@@ -482,7 +492,12 @@ export default function RashiPage({ params }: { params: Promise<{ id: string }> 
                           : "—"}
                       </p>
                       <p className="mt-0.5 text-xs text-(--color-ink-soft)">
-                        {t("house")} {p.houseFromLagna} ({t("fromLagna")}) · {p.houseFromMoon} ({t("fromYourMoon")})
+                        {t("yourHouse")} {p.judgement.houseFromLagna}
+                        {p.judgement.rules.length > 0 &&
+                          ` · ${t("rulesHouses")} ${p.judgement.rules.join(", ")}`}
+                        {p.judgement.bindus !== null &&
+                          ` · ${p.judgement.bindus}/8 ${t("bindus")}`}
+                        {` · ${p.judgement.nature === "neutral" ? t("neutralNature") : t(p.judgement.nature as never)}`}
                       </p>
                       <div className="mt-1.5 flex flex-wrap gap-1">
                         {p.keywords.map((k, i) => (
@@ -542,7 +557,8 @@ export default function RashiPage({ params }: { params: Promise<{ id: string }> 
                             </p>
                           )}
                           <p className="text-(--color-ink-soft)">
-                            {lang === "hi" ? w.taraName.hi : w.taraName.en} · {t("chandraOfDay")} {w.chandraHouse}
+                            {lang === "hi" ? w.taraName.hi : w.taraName.en} · {t("yourHouse")} {w.moonHouseFromLagna}
+          {w.dashaSupports && w.dashaLord ? ` · ${planetName(w.dashaLord, lang)} ✓` : ""}
                             {w.festivals.length > 0 && (
                               <span className="ml-2 text-rose-300">
                                 🪔 {(lang === "hi" ? w.festivals[0].hi : w.festivals[0].en).split(" · ")[0]}
@@ -582,7 +598,7 @@ export default function RashiPage({ params }: { params: Promise<{ id: string }> 
                   </div>
                 </section>
               )}
-              <p className="text-xs text-(--color-ink-soft)">{t("datesNote")}</p>
+              <p className="text-xs text-(--color-ink-soft)">{t("lagnaBasedNote")}</p>
 
               {/* 4. AI reading */}
               <section className="card border-l-4 border-violet-500/40 p-5">

@@ -42,8 +42,9 @@ const BodySchema = z.object({
       dasamsa: z.string().max(500).optional(),
       sav: z.string().max(300).optional(),
       currentDasha: z.string().max(300),
+      dashaActivates: z.string().max(300).optional(),
       upcomingDashas: z.array(z.string().max(120)).max(10).optional(),
-      transits: z.array(z.string().max(120)).max(10).optional(),
+      transits: z.array(z.string().max(300)).max(10).optional(),
       sadeSati: z.string().max(20).optional(),
       yogas: z.array(z.string().max(120)).max(40),
       moonNakshatra: z.string().max(40).optional(),
@@ -96,12 +97,13 @@ function buildPrompt(body: z.infer<typeof BodySchema>): string {
     ``,
     `=== VIMSHOTTARI DASHA ===`,
     `Running now: ${k.currentDasha}`,
+    k.dashaActivates ?? "",
     k.upcomingDashas?.length
       ? `Upcoming antardashas: ${k.upcomingDashas.join("; ")}`
       : "",
     ``,
     k.transits?.length
-      ? `=== CURRENT TRANSITS (GOCHAR, today) ===\n${k.transits.join("\n")}\nSade Sati status: ${k.sadeSati ?? "unknown"}`
+      ? `=== CURRENT TRANSITS, JUDGED FROM THIS CHART'S LAGNA ===\n${k.transits.join("\n")}\nSade Sati status: ${k.sadeSati ?? "unknown"}`
       : "",
     ``,
     k.sav ? `=== SARVASHTAKAVARGA (bindus per sign; 28+ strong, <25 weak) ===\n${k.sav}` : "",
@@ -123,7 +125,9 @@ function buildPrompt(body: z.infer<typeof BodySchema>): string {
 const RASHI_SYSTEM_PROMPT = (lang: "en" | "hi") =>
   [
     "You are a master Vedic astrologer (Jyotish) reading ONE person's birth chart. This is a personal consultation, NOT a Moon-sign column.",
-    "You are given the native's COMPLETE chart: D1 with degrees and nakshatras, every house lord's placement, D9, D10, sarvashtakavarga, running and upcoming dashas, and today's transits.",
+    "You are given the native's COMPLETE chart: D1 with degrees and nakshatras, every house lord's placement, D9, D10, sarvashtakavarga, running and upcoming dashas, and today's transits already judged from this chart's LAGNA (with the house each planet transits, its functional rulership for this lagna, and the native's own ashtakavarga bindus).",
+    "",
+    "JUDGE FROM THE LAGNA CHART, NOT THE MOON SIGN. This is a birth-chart reading, not a rashiphal. Reason from: the lagna and its lord; the relevant house lords and where they sit; each planet's FUNCTIONAL nature for this lagna (trikona lords benefic, dusthana lords malefic); the native's own ashtakavarga bindus (5+ delivers, 3 or fewer struggles); the running Vimshottari dasha and what it activates in this chart; and the divisional charts. Do NOT base any conclusion on 'Saturn is in the Nth house from the Moon' or on what the Moon sign generally means — that is a mass forecast, and this native's own chart overrides it.",
     "",
     "CRITICAL: Never give generic 'people of this rashi will...' statements. Every sentence must be justified by a placement in THIS chart. If something is true only because of this native's specific house lord, dasha or varga, say so.",
     "",
@@ -151,7 +155,9 @@ const RASHI_SYSTEM_PROMPT = (lang: "en" | "hi") =>
 const VERIFY_SYSTEM_PROMPT = (lang: "en" | "hi") =>
   [
     "You are a master Vedic astrologer (Jyotish). The user has pasted a prediction made for their Moon sign (rashi) by someone else — a generic forecast aimed at everyone born under that sign. Your job is to TEST each claim against this native's actual birth chart and keep only what is genuinely true for them.",
-    "You are given the native's COMPLETE chart: D1 with degrees and nakshatras, every house lord's placement, D9, D10, sarvashtakavarga, running and upcoming dashas, and today's transits.",
+    "You are given the native's COMPLETE chart: D1 with degrees and nakshatras, every house lord's placement, D9, D10, sarvashtakavarga, running and upcoming dashas, and today's transits already judged from this chart's LAGNA (with the house each planet transits, its functional rulership for this lagna, and the native's own ashtakavarga bindus).",
+    "",
+    "JUDGE FROM THE LAGNA CHART, NOT THE MOON SIGN. This is a birth-chart reading, not a rashiphal. Reason from: the lagna and its lord; the relevant house lords and where they sit; each planet's FUNCTIONAL nature for this lagna (trikona lords benefic, dusthana lords malefic); the native's own ashtakavarga bindus (5+ delivers, 3 or fewer struggles); the running Vimshottari dasha and what it activates in this chart; and the divisional charts. Do NOT base any conclusion on 'Saturn is in the Nth house from the Moon' or on what the Moon sign generally means — that is a mass forecast, and this native's own chart overrides it.",
     "",
     "WRITE EXACTLY THESE THREE SECTIONS:",
     "",
@@ -200,7 +206,9 @@ const SYSTEM_PROMPT = (lang: "en" | "hi") =>
 const SCHEDULE_SYSTEM_PROMPT = (lang: "en" | "hi") =>
   [
     "You are a master Vedic astrologer (Jyotish) preparing a practical DATE-AND-TIME action plan for ONE person, for the asked life area.",
-    "You are given the native's COMPLETE chart AND a pre-computed table of days with their exact clock windows (Abhijit muhurta = best window, Rahu Kaal = blocked window, plus a personal day score from Tarabala, Chandra Bala and the weekday ruler).",
+    "You are given the native's COMPLETE chart AND a pre-computed table of days with their exact clock windows (Abhijit muhurta = best window, Rahu Kaal = blocked window, plus a personal day score computed from this chart: Tarabala from the birth star, the Moon's transit house from THIS lagna weighted by the native's own bindus, the weekday ruler, and the running dasha).",
+    "",
+    "JUDGE FROM THE LAGNA CHART, NOT THE MOON SIGN. Justify each day's guidance from this chart's house lords, ashtakavarga bindus, functional rulerships and the running dasha — never from what the Moon sign means generally.",
     "",
     "CRITICAL RULES:",
     "• Use the supplied dates and clock times EXACTLY as given. Never invent or shift a time.",

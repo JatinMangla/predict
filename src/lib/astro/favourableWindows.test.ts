@@ -34,7 +34,7 @@ const kundliB = computeKundli({
 });
 
 describe("personal favourable windows", () => {
-  const winA = personalDayWindows(kundliA, ["Saturn", "Sun", "Mercury"], NOW, 30, TZ);
+  const winA = personalDayWindows(kundliA, [10, 6, 2], ["Saturn", "Sun", "Mercury"], NOW, 30, TZ);
 
   it("covers the requested range with scored days", () => {
     expect(winA.length).toBeGreaterThanOrEqual(28);
@@ -64,14 +64,14 @@ describe("personal favourable windows", () => {
   });
 
   it("is personal: two different charts get different best days", () => {
-    const winB = personalDayWindows(kundliB, ["Saturn", "Sun", "Mercury"], NOW, 30, TZ);
+    const winB = personalDayWindows(kundliB, [10, 6, 2], ["Saturn", "Sun", "Mercury"], NOW, 30, TZ);
     const daysA = bestDays(winA, 6).map((w) => w.dayStartMs).join(",");
     const daysB = bestDays(winB, 6).map((w) => w.dayStartMs).join(",");
     expect(daysA).not.toBe(daysB);
   });
 
   it("weekday lord matching lifts the score for that area", () => {
-    const careerWin = personalDayWindows(kundliA, ["Saturn"], NOW, 30, TZ);
+    const careerWin = personalDayWindows(kundliA, [10], ["Saturn"], NOW, 30, TZ);
     const saturdays = careerWin.filter((w) => w.varaLord === "Saturn");
     expect(saturdays.length).toBeGreaterThan(0);
     expect(saturdays.every((w) => w.varaMatch)).toBe(true);

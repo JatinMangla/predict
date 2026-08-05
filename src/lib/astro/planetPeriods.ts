@@ -2,9 +2,9 @@
 // it leaves, and what it is currently doing to this chart — so the planet
 // section can show a real from/to period instead of a bare position.
 
-import type { PlanetId } from "./types";
+import type { Kundli, PlanetId } from "./types";
 import { siderealLongitude, planetSpeed } from "./ephemeris";
-import { houseFromMoon } from "./transits";
+import { judgeTransit, type TransitJudgement } from "./chartJudgement";
 
 const DAY_MS = 86400 * 1000;
 const MIN_MS = 60 * 1000;
@@ -31,10 +31,8 @@ export interface TransitPeriod {
   enteredMs: number | null;
   /** UTC ms when it leaves this sign (null if beyond the search bound) */
   leavesMs: number | null;
-  /** house counted from the natal Moon */
-  houseFromMoon: number;
-  /** house counted from the natal lagna */
-  houseFromLagna: number;
+  /** judgement made from THIS chart: house from lagna, bindus, rulership */
+  judgement: TransitJudgement;
 }
 
 function signAt(planet: PlanetId, ms: number): number {
@@ -65,8 +63,7 @@ function bisectBoundary(
  */
 export function currentTransitPeriod(
   planet: PlanetId,
-  natalMoonSign: number,
-  lagnaSign: number,
+  kundli: Kundli,
   atMs: number = Date.now()
 ): TransitPeriod {
   const lon = siderealLongitude(planet, atMs);
@@ -114,7 +111,6 @@ export function currentTransitPeriod(
     retrograde: isNode ? true : planetSpeed(planet, atMs) < 0,
     enteredMs,
     leavesMs,
-    houseFromMoon: houseFromMoon(natalMoonSign, sign),
-    houseFromLagna: ((sign - lagnaSign + 12) % 12) + 1,
+    judgement: judgeTransit(kundli, planet, sign),
   };
 }

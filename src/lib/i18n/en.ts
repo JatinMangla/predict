@@ -172,6 +172,14 @@ export const en = {
   stayFrom: "Entered",
   stayTill: "Stays till",
   fromLagna: "from lagna",
+  yourHouse: "Your house",
+  rulesHouses: "rules houses",
+  bindus: "bindus",
+  benefic: "benefic for your lagna",
+  malefic: "malefic for your lagna",
+  neutralNature: "neutral",
+  lagnaBasedNote:
+    "Every judgement here comes from YOUR birth chart — your lagna, your house lords, your own ashtakavarga bindus and your running dasha. Nothing is based on what your Moon sign means for people in general.",
   planetPeriodsNote:
     "Each planet's current sign with the exact moment it entered and when it leaves. Chips show what it is activating in your chart right now.",
   verifyForecast: "Check any forecast against your chart",

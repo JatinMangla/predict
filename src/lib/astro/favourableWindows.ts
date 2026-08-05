@@ -1,19 +1,23 @@
 // Personal favourable/unfavourable date windows WITH exact clock times,
-// computed from this kundli alone (not sign-level):
-//   • Tarabala   — the day's nakshatra counted from the native's birth star
-//   • Chandra bala — transiting Moon's house from the natal Moon
-//   • Vara lord  — weekday ruler matching the life area's karaka
-//   • Muhurta    — Abhijit as the acting window, Rahu Kaal etc. as the block
-// Everything here is arithmetic, so the times are exact rather than guessed.
+// judged from THIS birth chart — not from the Moon sign.
+//
+// Each day is scored on four chart-specific factors:
+//   • Tarabala        — the day's star counted from THIS native's birth star
+//   • Moon's transit  — which house of THIS chart it activates, weighted by
+//                       the native's own Moon ashtakavarga bindus
+//   • Vara lord       — weekday ruler matching the life area's karaka
+//   • Running dasha   — whether the pratyantardasha lord rules or occupies
+//                       the houses of the asked area in THIS chart
+// Times come from the day's real sunrise/sunset, so they are exact.
 
 import type { Kundli, PlanetId } from "./types";
 import {
   buildMonthCalendar,
   dayTimings,
-  personalDayQuality,
   TARABALA9,
   type CalendarDayInfo,
 } from "./hinduCalendar";
+import { binduFor, dashaContext, functionalNature } from "./chartJudgement";
 
 /** Weekday rulers, Sunday first */
 export const VARA_LORDS: PlanetId[] = [
@@ -33,12 +37,16 @@ export interface FavourableWindow {
   taraIndex: number;
   taraName: { en: string; hi: string };
   taraGood: boolean | null;
-  /** transiting Moon's house from natal Moon */
-  chandraHouse: number;
-  chandraGood: boolean;
+  /** house of THIS chart the transiting Moon activates (from lagna) */
+  moonHouseFromLagna: number;
+  /** native's own Moon bindus in the sign the Moon transits */
+  moonBindus: number | null;
   /** weekday lord rules this life area? */
   varaMatch: boolean;
   varaLord: PlanetId;
+  /** running pratyantardasha lord and whether it activates the area */
+  dashaLord: PlanetId | null;
+  dashaSupports: boolean;
   /** 0–100 personal score for the day */
   score: number;
   rating: "excellent" | "good" | "mixed" | "avoid";
@@ -48,45 +56,75 @@ export interface FavourableWindow {
   /** window to avoid (Rahu Kaal) */
   avoidFrom?: number;
   avoidTo?: number;
-  /** festivals on the day, if any */
   festivals: { en: string; hi: string }[];
 }
 
 function scoreDay(
+  kundli: Kundli,
   day: CalendarDayInfo,
   birthNakshatra: number,
-  natalMoonSign: number,
+  areaHouses: number[],
   karakas: PlanetId[]
 ): FavourableWindow {
-  const q = personalDayQuality(day, birthNakshatra, natalMoonSign);
+  const lagna = kundli.lagna.sign;
+
+  // 1. Tarabala — counted from this native's own birth star
+  const taraIndex = (((day.nakshatra - birthNakshatra + 27) % 27) % 9 + 9) % 9;
+  const tara = TARABALA9[taraIndex];
+
+  // 2. The transiting Moon judged against THIS chart (house from lagna +
+  //    this native's own Moon bindus in that sign)
+  const moonHouseFromLagna = ((day.moonSign - lagna + 12) % 12) + 1;
+  const moonBindus = binduFor(kundli, "Moon", day.moonSign);
+
+  // 3. Weekday lord relevant to the asked area
   const varaLord = VARA_LORDS[day.weekday];
   const varaMatch = karakas.includes(varaLord);
 
-  // Tarabala carries the most weight, then chandra bala, then the vara lord.
+  // 4. The dasha actually running for this native on that day
+  const dc = dashaContext(kundli, day.refMs);
+  const dashaLord = dc?.pratyantarLord ?? dc?.antarLord ?? dc?.mahaLord ?? null;
+  const dashaSupports = dc
+    ? dc.activatesHouses.some((h) => areaHouses.includes(h))
+    : false;
+
   let score = 40;
-  if (q.taraGood === true) score += 30;
-  else if (q.taraGood === false) score -= 28;
-  else score += 4; // Janma tara: neutral-ish
-  score += q.chandraGood ? 20 : -18;
-  if (varaMatch) score += 12;
-  // Purnima/Amavasya add volatility to an otherwise ordinary day
-  if (day.isAmavasya) score -= 6;
-  if (day.isPurnima) score += 3;
+  if (tara.good === true) score += 26;
+  else if (tara.good === false) score -= 26;
+  else score += 3;
+
+  if (areaHouses.includes(moonHouseFromLagna)) score += 10;
+  else if ([6, 8, 12].includes(moonHouseFromLagna)) score -= 12;
+  else if ([1, 5, 9, 10, 11].includes(moonHouseFromLagna)) score += 6;
+
+  if (moonBindus !== null) {
+    if (moonBindus >= 5) score += 12;
+    else if (moonBindus <= 2) score -= 12;
+  }
+
+  if (varaMatch) score += 10;
+  if (dashaSupports) score += 10;
+  if (dc && dc.nature === "malefic") score -= 8;
+  else if (dc && dc.nature === "benefic") score += 6;
+
+  if (day.isAmavasya) score -= 5;
   score = Math.max(0, Math.min(100, score));
 
   const rating: FavourableWindow["rating"] =
-    score >= 78 ? "excellent" : score >= 60 ? "good" : score >= 42 ? "mixed" : "avoid";
+    score >= 76 ? "excellent" : score >= 60 ? "good" : score >= 42 ? "mixed" : "avoid";
 
   const tm = dayTimings(day);
   return {
     dayStartMs: day.dayStartMs,
-    taraIndex: q.taraIndex,
-    taraName: TARABALA9[q.taraIndex],
-    taraGood: q.taraGood,
-    chandraHouse: q.chandraHouse,
-    chandraGood: q.chandraGood,
+    taraIndex,
+    taraName: tara.name,
+    taraGood: tara.good,
+    moonHouseFromLagna,
+    moonBindus,
     varaMatch,
     varaLord,
+    dashaLord,
+    dashaSupports,
     score,
     rating,
     bestFrom: tm.abhijit?.[0],
@@ -98,11 +136,12 @@ function scoreDay(
 }
 
 /**
- * Scan `days` days from `fromMs` and return every day scored for this native.
- * `karakas` are the life area's significators (from the category definition).
+ * Scan `days` days from `fromMs`, scoring each against THIS chart for the
+ * given life area (its houses and karakas).
  */
 export function personalDayWindows(
   kundli: Kundli,
+  areaHouses: number[],
   karakas: PlanetId[],
   fromMs: number,
   days: number,
@@ -112,7 +151,6 @@ export function personalDayWindows(
   const start = new Date(fromMs);
   const out: FavourableWindow[] = [];
 
-  // Walk month by month so sunrise/tithi come from the shared builder
   let cursorYear = start.getFullYear();
   let cursorMonth = start.getMonth();
   const endMs = fromMs + days * 86400 * 1000;
@@ -128,7 +166,7 @@ export function personalDayWindows(
     for (const d of month) {
       if (d.dayStartMs + 86400 * 1000 < fromMs) continue;
       if (d.dayStartMs > endMs) break;
-      out.push(scoreDay(d, moon.nakshatra, moon.sign, karakas));
+      out.push(scoreDay(kundli, d, moon.nakshatra, areaHouses, karakas));
     }
     if (month.length && month[month.length - 1].dayStartMs > endMs) break;
     cursorMonth += 1;
@@ -163,3 +201,5 @@ export function cautionDays(
     .slice(0, count)
     .sort((a, b) => a.dayStartMs - b.dayStartMs);
 }
+
+export { functionalNature };

@@ -187,16 +187,21 @@ export function dayTimings(day: CalendarDayInfo): DayTimings {
 
 // ── Personal (kundli-based) day quality ─────────────────────────────
 
-export const TARABALA9: { en: string; hi: string; good: boolean | null }[] = [
-  { en: "Janma", hi: "जन्म", good: null },
-  { en: "Sampat", hi: "संपत्", good: true },
-  { en: "Vipat", hi: "विपत्", good: false },
-  { en: "Kshema", hi: "क्षेम", good: true },
-  { en: "Pratyari", hi: "प्रत्यरि", good: false },
-  { en: "Sadhaka", hi: "साधक", good: true },
-  { en: "Vadha", hi: "वध", good: false },
-  { en: "Mitra", hi: "मैत्र", good: true },
-  { en: "Ati-Mitra", hi: "अति मैत्र", good: true },
+export const TARABALA9: {
+  name: { en: string; hi: string };
+  en: string;
+  hi: string;
+  good: boolean | null;
+}[] = [
+  { name: { en: "Janma", hi: "जन्म" }, en: "Janma", hi: "जन्म", good: null },
+  { name: { en: "Sampat", hi: "संपत्" }, en: "Sampat", hi: "संपत्", good: true },
+  { name: { en: "Vipat", hi: "विपत्" }, en: "Vipat", hi: "विपत्", good: false },
+  { name: { en: "Kshema", hi: "क्षेम" }, en: "Kshema", hi: "क्षेम", good: true },
+  { name: { en: "Pratyari", hi: "प्रत्यरि" }, en: "Pratyari", hi: "प्रत्यरि", good: false },
+  { name: { en: "Sadhaka", hi: "साधक" }, en: "Sadhaka", hi: "साधक", good: true },
+  { name: { en: "Vadha", hi: "वध" }, en: "Vadha", hi: "वध", good: false },
+  { name: { en: "Mitra", hi: "मैत्र" }, en: "Mitra", hi: "मैत्र", good: true },
+  { name: { en: "Ati-Mitra", hi: "अति मैत्र" }, en: "Ati-Mitra", hi: "अति मैत्र", good: true },
 ];
 
 /** Chandra bala: favourable transit-Moon houses from the natal Moon */

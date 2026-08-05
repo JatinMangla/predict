@@ -11,11 +11,8 @@ import {
   SIGN_LORDS,
 } from "@/lib/astro/constants";
 import { activeDashas } from "@/lib/astro/dasha";
-import {
-  currentPositions,
-  houseFromMoon,
-  sadeSatiPhase,
-} from "@/lib/astro/transits";
+import { currentPositions, sadeSatiPhase } from "@/lib/astro/transits";
+import { judgeTransit, dashaContext } from "@/lib/astro/chartJudgement";
 import { YOGA_MEANINGS } from "@/lib/interpret/kb/yogaMeanings";
 import { fmtDegInSign } from "@/lib/format";
 
@@ -68,12 +65,19 @@ export function buildKundliSummary(kundli: Kundli) {
       )
       .join(", ");
 
-  // Current sky (gochar) relative to natal Moon
+  // Current sky (gochar) judged against THIS chart: house from the lagna,
+  // the native's own ashtakavarga bindus, and functional rulership.
   const natalMoon = kundli.planets.find((p) => p.id === "Moon")!;
   const sky = currentPositions(now);
   const transits = sky.map((p) => {
-    const h = houseFromMoon(natalMoon.sign, p.sign);
-    return `${PLANET_NAMES[p.id].en} in ${SIGN_NAMES[p.sign].en} (${h}th from natal Moon${p.retrograde && p.id !== "Rahu" && p.id !== "Ketu" ? ", retrograde" : ""})`;
+    const j = judgeTransit(kundli, p.id, p.sign);
+    const rules = j.rules.length ? `rules H${j.rules.join("/")}` : "no rulership";
+    const bindus = j.bindus !== null ? `${j.bindus} bindus in own BAV` : "no BAV";
+    return (
+      `${PLANET_NAMES[p.id].en} in ${SIGN_NAMES[p.sign].en} — transiting YOUR ${j.houseFromLagna}th house from lagna; ` +
+      `${rules} (functional ${j.nature}); ${bindus}` +
+      `${p.retrograde && p.id !== "Rahu" && p.id !== "Ketu" ? "; retrograde" : ""}`
+    );
   });
   const satNow = sky.find((p) => p.id === "Saturn")!;
   const ss = sadeSatiPhase(satNow.sign, natalMoon.sign);
@@ -101,6 +105,12 @@ export function buildKundliSummary(kundli: Kundli) {
       (v, s) => `${SIGN_NAMES[s].en}:${v}`
     ).join(", "),
     currentDasha: dashaStr,
+    dashaActivates: (() => {
+      const dc = dashaContext(kundli, now);
+      return dc
+        ? `Running lords activate houses ${dc.activatesHouses.join(", ")} of this chart; deepest lord is functionally ${dc.nature} for this lagna`
+        : undefined;
+    })(),
     upcomingDashas: upcoming,
     transits,
     sadeSati: ss,
