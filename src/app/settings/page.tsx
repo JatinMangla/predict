@@ -4,21 +4,13 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { useI18n } from "@/lib/i18n";
 import { db, getSetting, setSetting } from "@/lib/db";
-import {
-  getAiConfig,
-  getUsageSummary,
-  setAiSetting,
-  fmtCost,
-  GEMINI_FREE_RPD,
-  type AiConfig,
-  type UsageSummary,
-} from "@/lib/aiClient";
+import { setAiSetting, fmtCost, fmtDuration, fmtUntil } from "@/lib/aiClient";
+import { useAiQuota } from "@/lib/useAiQuota";
 
 export default function SettingsPage() {
   const { t, lang, setLang } = useI18n();
   const [chartStyle, setChartStyle] = useState<"north" | "south">("north");
-  const [cfg, setCfg] = useState<AiConfig | null>(null);
-  const [usage, setUsage] = useState<UsageSummary | null>(null);
+  const { cfg, usage, refresh } = useAiQuota();
   const [keyInput, setKeyInput] = useState("");
   const [message, setMessage] = useState("");
   const [keyMessage, setKeyMessage] = useState("");
@@ -27,12 +19,12 @@ export default function SettingsPage() {
     getSetting("chartStyle").then((v) => {
       if (v === "south" || v === "north") setChartStyle(v);
     });
-    getAiConfig().then((c) => {
-      setCfg(c);
-      setKeyInput(c.geminiKey);
-    });
-    getUsageSummary().then(setUsage);
   }, []);
+
+  // Prefill the key box once the stored config arrives
+  useEffect(() => {
+    if (cfg) setKeyInput(cfg.geminiKey);
+  }, [cfg]);
 
   const saveChartStyle = (s: "north" | "south") => {
     setChartStyle(s);
@@ -42,7 +34,8 @@ export default function SettingsPage() {
   const saveKey = async () => {
     const trimmed = keyInput.trim();
     await setAiSetting("geminiKey", trimmed);
-    setCfg((c) => (c ? { ...c, geminiKey: trimmed } : c));
+    // A different key means a different quota — re-read the figures
+    await refresh();
     setKeyMessage(trimmed ? `✓ ${t("keySaved")}` : `✓ ${t("keyRemoved")}`);
   };
 
@@ -84,6 +77,9 @@ export default function SettingsPage() {
 
   const aiConfigured =
     cfg !== null && (cfg.serverClaude || cfg.serverGemini || cfg.geminiKey.length > 0);
+
+  // Only shown once Claude has actually answered once and reported its headers
+  const claudeRemaining = usage?.claude?.requestsRemaining ?? null;
 
   return (
     <AppShell>
@@ -148,11 +144,20 @@ export default function SettingsPage() {
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div className="rounded-lg border border-(--color-line) p-3">
                   <p className="text-xs text-(--color-ink-soft)">{t("aiUsageToday")}</p>
-                  <p className="mt-1 text-lg font-semibold accent-text">
-                    {usage.geminiRemaining}/{GEMINI_FREE_RPD}{" "}
+                  <p
+                    className={`mt-1 text-lg font-semibold ${
+                      usage.geminiRemaining <= 0 ? "text-red-300" : "accent-text"
+                    }`}
+                  >
+                    {usage.geminiRemaining}/{usage.geminiLimit}{" "}
                     <span className="text-xs font-normal">{t("freeCallsLeft")}</span>
                   </p>
                   <p className="text-xs text-(--color-ink-soft)">{fmtCost(usage.costTodayUsd)}</p>
+                  {usage.resetAt !== null && (
+                    <p className="text-xs text-(--color-ink-soft)">
+                      {t("quotaResetsIn")} {fmtUntil(usage.resetAt)}
+                    </p>
+                  )}
                 </div>
                 <div className="rounded-lg border border-(--color-line) p-3">
                   <p className="text-xs text-(--color-ink-soft)">{t("aiCost30d")}</p>
@@ -160,7 +165,34 @@ export default function SettingsPage() {
                   <p className="text-xs text-(--color-ink-soft)">Gemini = {t("free")}</p>
                 </div>
               </div>
+
+              {/* Anthropic reports its real remaining limits on every response */}
+              {claudeRemaining !== null && (
+                <p className="mt-1.5 text-xs text-(--color-ink-soft)">
+                  Claude: {claudeRemaining}
+                  {usage.claude?.requestsLimit != null
+                    ? `/${usage.claude.requestsLimit}`
+                    : ""}{" "}
+                  {t("requestsRemaining")}
+                </p>
+              )}
+
               <p className="mt-1.5 text-xs text-(--color-ink-soft)">{t("quotaNote")}</p>
+              <div className="mt-1.5 flex items-center gap-2">
+                <p className="text-xs text-(--color-ink-soft)">
+                  {usage.syncedAt === 0
+                    ? t("quotaNeverSynced")
+                    : `${t("quotaSynced")} ${fmtDuration(
+                        Date.now() - usage.syncedAt
+                      )} ${t("ago")}`}
+                </p>
+                <button
+                  onClick={() => void refresh()}
+                  className="rounded-md border border-(--color-line) px-2 py-0.5 text-xs text-(--color-ink-soft) transition hover:border-(--accent)"
+                >
+                  ↻ {t("refresh")}
+                </button>
+              </div>
             </div>
           )}
 

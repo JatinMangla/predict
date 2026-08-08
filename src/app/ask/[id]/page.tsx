@@ -11,16 +11,8 @@ import { useKundli } from "@/lib/useKundli";
 import { useI18n } from "@/lib/i18n";
 import { AppShell } from "@/components/AppShell";
 import { ProfileTheme } from "@/components/ProfileTheme";
-import {
-  getAiConfig,
-  getUsageSummary,
-  callAi,
-  aiAvailable,
-  fmtCost,
-  GEMINI_FREE_RPD,
-  type AiConfig,
-  type UsageSummary,
-} from "@/lib/aiClient";
+import { callAi, aiAvailable, aiErrorKey, fmtCost } from "@/lib/aiClient";
+import { useAiQuota } from "@/lib/useAiQuota";
 import { db, type QARecord } from "@/lib/db";
 
 interface ChatItem {
@@ -38,8 +30,7 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
   const [items, setItems] = useState<ChatItem[]>([]);
   const [question, setQuestion] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
-  const [cfg, setCfg] = useState<AiConfig | null>(null);
-  const [usage, setUsage] = useState<UsageSummary | null>(null);
+  const { cfg, usage } = useAiQuota();
   const [notice, setNotice] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -53,15 +44,6 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
         .toArray(),
     [profileId]
   );
-
-  const refreshUsage = useCallback(() => {
-    getUsageSummary().then(setUsage);
-  }, []);
-
-  useEffect(() => {
-    getAiConfig().then(setCfg);
-    refreshUsage();
-  }, [refreshUsage]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -78,10 +60,8 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
       setNotice("");
       const result = await callAi(q, kundli, lang, cfg);
       setAiBusy(false);
-      refreshUsage();
       if (typeof result === "string") {
-        if (result === "quota-exhausted") setNotice(t("aiQuotaExhausted"));
-        else setNotice(t("aiUnavailable"));
+        setNotice(t(aiErrorKey(result)));
         return;
       }
       setItems((prev) => [
@@ -105,7 +85,7 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
         // history is best-effort
       }
     },
-    [kundli, cfg, aiBusy, lang, t, profileId, refreshUsage]
+    [kundli, cfg, aiBusy, lang, t, profileId]
   );
 
   const submit = (e: React.FormEvent) => {
@@ -147,7 +127,7 @@ export default function AskPage({ params }: { params: Promise<{ id: string }> })
                 }`}
                 title={t("quotaNote")}
               >
-                ✨ {usage.geminiRemaining}/{GEMINI_FREE_RPD} {t("freeCallsLeft")}
+                ✨ {usage.geminiRemaining}/{usage.geminiLimit} {t("freeCallsLeft")}
                 {usage.costTodayUsd > 0 ? ` · ${fmtCost(usage.costTodayUsd)}` : ""}
               </Link>
             )}

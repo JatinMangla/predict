@@ -17,16 +17,8 @@ import {
   type PrecisionFunnel,
   type ScopeKind,
 } from "@/lib/astro/precisionTiming";
-import {
-  getAiConfig,
-  getUsageSummary,
-  callAi,
-  aiAvailable,
-  fmtCost,
-  GEMINI_FREE_RPD,
-  type AiConfig,
-  type UsageSummary,
-} from "@/lib/aiClient";
+import { callAi, aiAvailable, aiErrorKey, fmtCost } from "@/lib/aiClient";
+import { useAiQuota } from "@/lib/useAiQuota";
 import { fmtDate, fmtTime, planetName } from "@/lib/format";
 
 const DAY_MS = 86400 * 1000;
@@ -58,16 +50,10 @@ export default function TimingPage({ params }: { params: Promise<{ id: string }>
   const [scopeKind, setScopeKind] = useState<ScopeKind>("monthly");
   const [pickedDate, setPickedDate] = useState(() => isoDate(new Date()));
   const [weekAnchor, setWeekAnchor] = useState(() => weekStart(Date.now()));
-  const [cfg, setCfg] = useState<AiConfig | null>(null);
-  const [usage, setUsage] = useState<UsageSummary | null>(null);
+  const { cfg, usage } = useAiQuota();
   const [reading, setReading] = useState<{ text: string; provider: string; costUsd: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
-
-  useEffect(() => {
-    getAiConfig().then(setCfg);
-    getUsageSummary().then(setUsage);
-  }, []);
 
   const scope = useMemo(() => {
     if (scopeKind === "daily") return { kind: scopeKind, fromMs: dayStart(pickedDate), days: 1 };
@@ -126,9 +112,8 @@ export default function TimingPage({ params }: { params: Promise<{ id: string }>
 
     const result = await callAi(question, kundli, lang, cfg, "schedule");
     setBusy(false);
-    getUsageSummary().then(setUsage);
     if (typeof result === "string") {
-      setNotice(result === "quota-exhausted" ? t("aiQuotaExhausted") : t("aiUnavailable"));
+      setNotice(t(aiErrorKey(result)));
       return;
     }
     setReading({ text: result.answer, provider: result.provider, costUsd: result.costUsd });
@@ -189,7 +174,7 @@ export default function TimingPage({ params }: { params: Promise<{ id: string }>
                   quotaExhausted ? "border-red-500/50 text-red-300" : "border-(--color-line) text-(--color-ink-soft)"
                 }`}
               >
-                ✨ {usage.geminiRemaining}/{GEMINI_FREE_RPD} {t("freeCallsLeft")}
+                ✨ {usage.geminiRemaining}/{usage.geminiLimit} {t("freeCallsLeft")}
               </Link>
             )}
           </div>

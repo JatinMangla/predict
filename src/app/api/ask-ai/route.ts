@@ -7,6 +7,13 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@/auth";
+import {
+  geminiKeyId,
+  quotaSnapshot,
+  recordClaudeHeaders,
+  recordGeminiCall,
+  recordGeminiQuotaError,
+} from "@/lib/quotaState";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -254,13 +261,19 @@ async function askClaude(
   if (!process.env.ANTHROPIC_API_KEY) return null;
   try {
     const client = new Anthropic();
-    const response = await client.messages.create({
-      model: "claude-opus-4-8",
-      max_tokens: 8000,
-      thinking: { type: "adaptive" },
-      system: systemFor(body),
-      messages: [{ role: "user", content: buildPrompt(body) }],
-    });
+    // withResponse() keeps the raw Response so the anthropic-ratelimit-*
+    // headers — the provider's own remaining-requests/tokens counts — can be
+    // recorded for the quota meter.
+    const { data: response, response: raw } = await client.messages
+      .create({
+        model: "claude-opus-4-8",
+        max_tokens: 8000,
+        thinking: { type: "adaptive" },
+        system: systemFor(body),
+        messages: [{ role: "user", content: buildPrompt(body) }],
+      })
+      .withResponse();
+    recordClaudeHeaders(raw.headers);
     if (response.stop_reason === "refusal") return null;
     const text = response.content
       .filter((b) => b.type === "text")
@@ -282,14 +295,23 @@ async function askClaude(
   }
 }
 
+/** Google's 429 tells us which quota was hit; the two need different handling */
+type GeminiQuotaHit = {
+  kind: "quota";
+  scope: "day" | "minute" | "unknown";
+  retryAfterMs: number | null;
+};
+
 async function askGemini(
   body: z.infer<typeof BodySchema>,
   clientKey: string | null
-): Promise<{ text: string; usage: AiUsage } | "quota" | null> {
+): Promise<{ text: string; usage: AiUsage } | GeminiQuotaHit | null> {
   // Server key first; otherwise the user's own free-tier key sent from the
   // browser (stored only client-side).
-  const key = process.env.GEMINI_API_KEY || clientKey;
+  const serverKey = process.env.GEMINI_API_KEY;
+  const key = serverKey || clientKey;
   if (!key) return null;
+  const keyId = geminiKeyId(key, Boolean(serverKey));
   try {
     const res = await fetch(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
@@ -313,7 +335,15 @@ async function askGemini(
         signal: AbortSignal.timeout(55_000),
       }
     );
-    if (res.status === 429) return "quota"; // Google's real free-tier quota is exhausted
+    // The request reached Google, so it counts against the free tier whatever
+    // the status turns out to be.
+    recordGeminiCall(keyId);
+    if (res.status === 429) {
+      // Google's real quota signal — the body names the enforced limit
+      const errBody = await res.json().catch(() => null);
+      const { scope, retryAfterMs } = recordGeminiQuotaError(keyId, errBody);
+      return { kind: "quota", scope, retryAfterMs };
+    }
     if (!res.ok) return null;
     const data = await res.json();
     const text: string | undefined =
@@ -363,33 +393,55 @@ export async function POST(req: Request) {
       answer: claude.text,
       provider: "claude",
       usage: claude.usage,
+      quota: quotaSnapshot(),
     });
   }
 
   const gemini = await askGemini(body, clientKey);
-  if (gemini === "quota") {
-    // Google's actual daily free quota is used up — tell the client precisely
-    return NextResponse.json({ error: "provider-quota" }, { status: 429 });
+  if (gemini && "kind" in gemini) {
+    // Google's own quota signal — a per-minute burst clears by itself, a
+    // per-day exhaustion lasts until midnight US-Pacific.
+    return NextResponse.json(
+      {
+        error:
+          gemini.scope === "minute" ? "provider-throttled" : "provider-quota",
+        retryAfterMs: gemini.retryAfterMs,
+        quota: quotaSnapshot(),
+      },
+      { status: 429 }
+    );
   }
   if (gemini) {
     return NextResponse.json({
       answer: gemini.text,
       provider: "gemini",
       usage: gemini.usage,
+      quota: quotaSnapshot(),
     });
   }
 
   return NextResponse.json({ error: "no-ai-available" }, { status: 503 });
 }
 
-/** Lets the client show whether AI assistance is configured (no keys exposed) */
+/**
+ * Quota + availability probe (no keys exposed). Returns whether AI assistance
+ * is configured, plus the freshest limit figures the server knows: Anthropic's
+ * own remaining-requests headers, and the Gemini day count corrected by
+ * Google's real 429s. The client polls this on landing, after every 10 AI
+ * calls, and hourly.
+ */
 export async function GET() {
   const session = await auth();
   if (!session?.user?.email) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  return NextResponse.json({
-    claude: Boolean(process.env.ANTHROPIC_API_KEY),
-    gemini: Boolean(process.env.GEMINI_API_KEY),
-  });
+  return NextResponse.json(
+    {
+      claude: Boolean(process.env.ANTHROPIC_API_KEY),
+      gemini: Boolean(process.env.GEMINI_API_KEY),
+      quota: quotaSnapshot(),
+    },
+    // Freshness is the whole point — never let a CDN or the browser cache it.
+    { headers: { "cache-control": "no-store" } }
+  );
 }

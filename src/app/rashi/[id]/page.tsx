@@ -28,16 +28,8 @@ import {
 } from "@/lib/interpret/kb/transitKeywords";
 import { SIGN_LORDS, SIGN_NAMES, NAKSHATRA_NAMES } from "@/lib/astro/constants";
 import type { PlanetId } from "@/lib/astro/types";
-import {
-  getAiConfig,
-  getUsageSummary,
-  callAi,
-  aiAvailable,
-  fmtCost,
-  GEMINI_FREE_RPD,
-  type AiConfig,
-  type UsageSummary,
-} from "@/lib/aiClient";
+import { callAi, aiAvailable, aiErrorKey, fmtCost } from "@/lib/aiClient";
+import { useAiQuota } from "@/lib/useAiQuota";
 import {
   fmtDate,
   fmtDegInSign,
@@ -74,19 +66,13 @@ export default function RashiPage({ params }: { params: Promise<{ id: string }> 
   const [period, setPeriod] = useState<Period>("daily");
   const [pickedDate, setPickedDate] = useState(() => isoDate(new Date()));
   const [weekAnchor, setWeekAnchor] = useState(() => weekStart(Date.now()));
-  const [cfg, setCfg] = useState<AiConfig | null>(null);
-  const [usage, setUsage] = useState<UsageSummary | null>(null);
+  const { cfg, usage } = useAiQuota();
   const [reading, setReading] = useState<{ text: string; provider: string; costUsd: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [pasted, setPasted] = useState("");
   const [verifyOut, setVerifyOut] = useState<{ text: string; provider: string; costUsd: number } | null>(null);
   const [verifyBusy, setVerifyBusy] = useState(false);
-
-  useEffect(() => {
-    getAiConfig().then(setCfg);
-    getUsageSummary().then(setUsage);
-  }, []);
 
   const moon = useMemo(
     () => kundli?.planets.find((p) => p.id === "Moon") ?? null,
@@ -240,9 +226,8 @@ export default function RashiPage({ params }: { params: Promise<{ id: string }> 
         isSchedule ? "schedule" : "rashi"
       );
       setBusy(false);
-      getUsageSummary().then(setUsage);
       if (typeof result === "string") {
-        setNotice(result === "quota-exhausted" ? t("aiQuotaExhausted") : t("aiUnavailable"));
+        setNotice(t(aiErrorKey(result)));
         return;
       }
       setReading({ text: result.answer, provider: result.provider, costUsd: result.costUsd });
@@ -259,9 +244,8 @@ export default function RashiPage({ params }: { params: Promise<{ id: string }> 
     const question = `Here is a prediction made for my Moon sign by someone else. Test every claim against MY chart and keep only what is actually true for me:\n\n"""\n${text.slice(0, 3500)}\n"""`;
     const result = await callAi(question, kundli, lang, cfg, "verify");
     setVerifyBusy(false);
-    getUsageSummary().then(setUsage);
     if (typeof result === "string") {
-      setNotice(result === "quota-exhausted" ? t("aiQuotaExhausted") : t("aiUnavailable"));
+      setNotice(t(aiErrorKey(result)));
       return;
     }
     setVerifyOut({ text: result.answer, provider: result.provider, costUsd: result.costUsd });
@@ -339,7 +323,7 @@ export default function RashiPage({ params }: { params: Promise<{ id: string }> 
                 }`}
                 title={t("quotaNote")}
               >
-                ✨ {usage.geminiRemaining}/{GEMINI_FREE_RPD} {t("freeCallsLeft")}
+                ✨ {usage.geminiRemaining}/{usage.geminiLimit} {t("freeCallsLeft")}
               </Link>
             )}
           </div>
