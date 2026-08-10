@@ -164,8 +164,12 @@ export function personalDayWindows(
       tzOffsetMinutes
     );
     for (const d of month) {
-      if (d.dayStartMs + 86400 * 1000 < fromMs) continue;
-      if (d.dayStartMs > endMs) break;
+      // Skip days that are already over: the previous day ends exactly at a
+      // midnight `fromMs`, so this must be `<=`, not `<`, or that day leaks in.
+      if (d.dayStartMs + 86400 * 1000 <= fromMs) continue;
+      // `endMs` is the first instant past the range, so a day starting on it
+      // belongs to the next window.
+      if (d.dayStartMs >= endMs) break;
       out.push(scoreDay(kundli, d, moon.nakshatra, areaHouses, karakas));
     }
     if (month.length && month[month.length - 1].dayStartMs > endMs) break;

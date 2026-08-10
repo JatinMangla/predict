@@ -33,6 +33,44 @@ const kundliB = computeKundli({
   place: "Mumbai",
 });
 
+describe("day range boundaries", () => {
+  /** local midnight for a yyyy-mm-dd, matching what the pickers produce */
+  const localMidnight = (y: number, m: number, d: number) =>
+    new Date(y, m - 1, d).getTime();
+
+  it("a single-day scan returns exactly that date, never the day before", () => {
+    const from = localMidnight(2026, 8, 20);
+    const w = personalDayWindows(kundliA, [10], ["Saturn"], from, 1, TZ);
+    expect(w.length).toBe(1);
+    const got = new Date(w[0].dayStartMs + 43200000);
+    expect(got.getFullYear()).toBe(2026);
+    expect(got.getMonth() + 1).toBe(8);
+    expect(got.getDate()).toBe(20);
+  });
+
+  it("a week scan starts on the anchor day and spans exactly seven days", () => {
+    const from = localMidnight(2026, 8, 17); // a Monday
+    const w = personalDayWindows(kundliA, [10], ["Saturn"], from, 7, TZ);
+    expect(w.length).toBe(7);
+    expect(new Date(w[0].dayStartMs + 43200000).getDate()).toBe(17);
+    expect(new Date(w[6].dayStartMs + 43200000).getDate()).toBe(23);
+  });
+
+  it("works across a month boundary", () => {
+    const from = localMidnight(2026, 8, 30);
+    const w = personalDayWindows(kundliA, [10], ["Saturn"], from, 4, TZ);
+    expect(w.length).toBe(4);
+    expect(new Date(w[0].dayStartMs + 43200000).getDate()).toBe(30);
+    expect(new Date(w[3].dayStartMs + 43200000).getMonth() + 1).toBe(9);
+  });
+
+  it("a mid-day start still includes today", () => {
+    const from = localMidnight(2026, 8, 20) + 14 * 3600 * 1000; // 2 pm
+    const w = personalDayWindows(kundliA, [10], ["Saturn"], from, 3, TZ);
+    expect(new Date(w[0].dayStartMs + 43200000).getDate()).toBe(20);
+  });
+});
+
 describe("personal favourable windows", () => {
   const winA = personalDayWindows(kundliA, [10, 6, 2], ["Saturn", "Sun", "Mercury"], NOW, 30, TZ);
 
