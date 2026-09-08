@@ -2,7 +2,7 @@
 
 // Single client-side gateway for all AI calls. There is NO artificial app
 // limit — the meter tracks Google's REAL Gemini free-tier quota
-// (gemini-2.5-flash: 250 requests/day, resetting at midnight US-Pacific),
+// (gemini-3.6-flash: 250 requests/day, resetting at midnight US-Pacific),
 // and Google's own 429 "quota exhausted" signal is surfaced directly.
 //
 // Google publishes no "calls remaining" endpoint, so the figure is reconciled
