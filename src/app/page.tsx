@@ -12,7 +12,52 @@ import { PanchangCard } from "@/components/kundli/PanchangCard";
 import { computePanchang } from "@/lib/astro/panchang";
 import { useCurrentPlace } from "@/lib/place";
 import { fmtDate } from "@/lib/format";
-import type { PanchangInfo } from "@/lib/astro/types";
+import type { PanchangInfo, StoredProfile } from "@/lib/astro/types";
+import { computeKundli } from "@/lib/astro/kundli";
+import { siderealLongitude } from "@/lib/astro/ephemeris";
+import { nakshatraOf } from "@/lib/astro/nakshatra";
+import { activeDashas } from "@/lib/astro/dasha";
+import { TARABALA9 } from "@/lib/astro/hinduCalendar";
+import { planetName } from "@/lib/format";
+import type { Lang } from "@/lib/i18n";
+
+/** Today's personal pulse: tara from the birth star, Chandra bala, running dasha */
+function TodayLine({ p, lang }: { p: StoredProfile; lang: Lang }) {
+  const info = useMemo(() => {
+    try {
+      const k = computeKundli(p);
+      const now = Date.now();
+      const moon = k.planets.find((x) => x.id === "Moon")!;
+      const moonNow = siderealLongitude("Moon", now);
+      const tara = ((nakshatraOf(moonNow) - moon.nakshatra + 27) % 27) % 9;
+      const chandraHouse = ((Math.floor(moonNow / 30) - moon.sign + 12) % 12) + 1;
+      const chandraGood = [1, 3, 6, 7, 10, 11].includes(chandraHouse);
+      const tg = TARABALA9[tara].good;
+      const score = (tg === true ? 1 : tg === null ? 0.5 : 0) + (chandraGood ? 1 : 0);
+      const dasha = activeDashas(k.dasha, now).slice(0, 2).map((d) => d.lord);
+      return { tara, score, dasha };
+    } catch {
+      return null;
+    }
+  }, [p]);
+  if (!info) return null;
+  const tone = info.score >= 1.5 ? "text-emerald-300" : info.score >= 1 ? "text-amber-300" : "text-red-300";
+  const label =
+    info.score >= 1.5
+      ? lang === "hi" ? "अनुकूल दिन" : "favourable day"
+      : info.score >= 1
+        ? lang === "hi" ? "मिश्रित दिन" : "mixed day"
+        : lang === "hi" ? "सावधानी का दिन" : "day for caution";
+  return (
+    <p className="mt-2 text-xs">
+      <span className={tone}>● {label}</span>
+      <span className="text-(--color-ink-soft)">
+        {" "}· {lang === "hi" ? "तारा" : "tara"} {lang === "hi" ? TARABALA9[info.tara].name.hi : TARABALA9[info.tara].name.en}
+        {info.dasha.length > 0 && ` · ${lang === "hi" ? "दशा" : "dasha"} ${info.dasha.map((d) => planetName(d, lang)).join("–")}`}
+      </span>
+    </p>
+  );
+}
 
 export default function DashboardPage() {
   const { t, lang } = useI18n();
@@ -81,6 +126,7 @@ export default function DashboardPage() {
                     {fmtDate(new Date(p.localDateTime).getTime(), lang)}{" "}
                     {p.localDateTime.slice(11, 16)} · {p.place}
                   </p>
+                  <TodayLine p={p} lang={lang} />
                   <div className="mt-4 flex flex-wrap gap-2 text-xs">
                     <Link href={`/kundli/${p.id}`} className="accent-bg rounded-md px-3 py-1.5 transition hover:brightness-125">
                       {t("kundli")}

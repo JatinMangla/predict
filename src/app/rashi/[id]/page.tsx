@@ -31,6 +31,7 @@ import type { PlanetId } from "@/lib/astro/types";
 import { callAi, aiAvailable, aiErrorKey, fmtCost } from "@/lib/aiClient";
 import { useAiQuota } from "@/lib/useAiQuota";
 import { useCurrentPlace } from "@/lib/place";
+import { Markdown } from "@/components/Markdown";
 import {
   fmtDate,
   fmtDegInSign,
@@ -75,6 +76,9 @@ export default function RashiPage({ params }: { params: Promise<{ id: string }> 
   const [pasted, setPasted] = useState("");
   const [verifyOut, setVerifyOut] = useState<{ text: string; provider: string; costUsd: number } | null>(null);
   const [verifyBusy, setVerifyBusy] = useState(false);
+  // text streamed so far while a reading is being written
+  const [live, setLive] = useState("");
+  const [verifyLive, setVerifyLive] = useState("");
 
   const moon = useMemo(
     () => kundli?.planets.find((p) => p.id === "Moon") ?? null,
@@ -200,6 +204,7 @@ export default function RashiPage({ params }: { params: Promise<{ id: string }> 
       setBusy(true);
       setNotice("");
       setReading(null);
+      setLive("");
 
       const isSchedule = p === "daily" || p === "weekly";
       let question: string;
@@ -226,7 +231,8 @@ export default function RashiPage({ params }: { params: Promise<{ id: string }> 
         kundli,
         lang,
         cfg,
-        isSchedule ? "schedule" : "rashi"
+        isSchedule ? "schedule" : "rashi",
+        { onDelta: (d) => setLive((s) => s + d), currentPlace: here?.place }
       );
       setBusy(false);
       if (typeof result === "string") {
@@ -235,7 +241,7 @@ export default function RashiPage({ params }: { params: Promise<{ id: string }> 
       }
       setReading({ text: result.answer, provider: result.provider, costUsd: result.costUsd });
     },
-    [kundli, cfg, moon, busy, lang, t, pickedDate, weekAnchor, windowTable]
+    [kundli, cfg, moon, busy, lang, t, pickedDate, weekAnchor, windowTable, here]
   );
 
   const verifyForecast = useCallback(async () => {
@@ -244,8 +250,11 @@ export default function RashiPage({ params }: { params: Promise<{ id: string }> 
     setVerifyBusy(true);
     setNotice("");
     setVerifyOut(null);
+    setVerifyLive("");
     const question = `Here is a prediction made for my Moon sign by someone else. Test every claim against MY chart and keep only what is actually true for me:\n\n"""\n${text.slice(0, 3500)}\n"""`;
-    const result = await callAi(question, kundli, lang, cfg, "verify");
+    const result = await callAi(question, kundli, lang, cfg, "verify", {
+      onDelta: (d) => setVerifyLive((s) => s + d),
+    });
     setVerifyBusy(false);
     if (typeof result === "string") {
       setNotice(t(aiErrorKey(result)));
@@ -603,7 +612,8 @@ export default function RashiPage({ params }: { params: Promise<{ id: string }> 
                     </button>
                   )}
                 </div>
-                {busy && <p className="text-sm text-(--color-ink-soft)">✨ {t("aiThinking")}</p>}
+                {busy && !live && <p className="text-sm text-(--color-ink-soft)">✨ {t("aiThinking")}</p>}
+                {busy && live && <Markdown text={live} />}
                 {notice && <p className="text-sm text-orange-300">{notice}</p>}
                 {!canUseAi && !busy && (
                   <p className="text-sm text-(--color-ink-soft)">
@@ -612,7 +622,7 @@ export default function RashiPage({ params }: { params: Promise<{ id: string }> 
                 )}
                 {reading && (
                   <>
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed">{reading.text}</p>
+                    <Markdown text={reading.text} />
                     <p className="mt-3 text-xs text-(--color-ink-soft)">
                       ✨ {reading.provider} · {reading.costUsd === 0 ? t("free") : fmtCost(reading.costUsd)}
                     </p>
@@ -642,10 +652,11 @@ export default function RashiPage({ params }: { params: Promise<{ id: string }> 
                   </button>
                   <span className="text-xs text-(--color-ink-soft)">{pasted.length}/3500</span>
                 </div>
-                {verifyBusy && <p className="mt-3 text-sm text-(--color-ink-soft)">✨ {t("aiThinking")}</p>}
+                {verifyBusy && !verifyLive && <p className="mt-3 text-sm text-(--color-ink-soft)">✨ {t("aiThinking")}</p>}
+                {verifyBusy && verifyLive && <Markdown className="mt-3" text={verifyLive} />}
                 {verifyOut && (
                   <>
-                    <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed">{verifyOut.text}</p>
+                    <Markdown className="mt-3" text={verifyOut.text} />
                     <p className="mt-3 text-xs text-(--color-ink-soft)">
                       ✨ {verifyOut.provider} · {verifyOut.costUsd === 0 ? t("free") : fmtCost(verifyOut.costUsd)}
                     </p>

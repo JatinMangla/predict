@@ -63,11 +63,40 @@ export default function SettingsPage() {
     try {
       const data = JSON.parse(await file.text());
       if (!Array.isArray(data.profiles)) throw new Error("bad file");
+      // Re-importing the same backup must not duplicate profiles: match on
+      // name + birth moment + place, and remap Q&A history to the local ids.
+      const existing = await db.profiles.toArray();
+      const keyOf = (p: { name: string; localDateTime: string; latitude: number; longitude: number }) =>
+        `${p.name}|${p.localDateTime}|${p.latitude.toFixed(3)}|${p.longitude.toFixed(3)}`;
+      const localIdByKey = new Map(existing.map((p) => [keyOf(p), p.id!]));
+      const idMap = new Map<number, number>();
+      let added = 0;
       for (const p of data.profiles) {
-        const { id: _id, ...rest } = p;
-        await db.profiles.add(rest);
+        const { id: oldId, ...rest } = p;
+        const k = keyOf(rest);
+        let localId = localIdByKey.get(k);
+        if (localId === undefined) {
+          localId = (await db.profiles.add(rest)) as number;
+          localIdByKey.set(k, localId);
+          added++;
+        }
+        if (typeof oldId === "number") idMap.set(oldId, localId);
       }
-      setMessage(`✓ Imported ${data.profiles.length} profiles`);
+      let qa = 0;
+      if (Array.isArray(data.qaHistory)) {
+        const seen = new Set((await db.qaHistory.toArray()).map((h) => `${h.profileId}|${h.createdAt}|${h.question}`));
+        for (const h of data.qaHistory) {
+          const pid = idMap.get(h.profileId);
+          if (pid === undefined) continue;
+          const key = `${pid}|${h.createdAt}|${h.question}`;
+          if (seen.has(key)) continue;
+          const { id: _qid, ...row } = h;
+          await db.qaHistory.add({ ...row, profileId: pid });
+          seen.add(key);
+          qa++;
+        }
+      }
+      setMessage(`✓ Imported ${added} new profile(s), ${qa} saved answer(s)`);
     } catch {
       setMessage("✕ Invalid backup file");
     }
