@@ -15,6 +15,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     { href: "/", label: t("dashboard") },
     { href: "/new", label: t("newProfile") },
     { href: "/calendar", label: t("calendarNav") },
+    { href: "/match", label: lang === "hi" ? "मिलान" : "Match" },
     { href: "/settings", label: t("settings") },
   ];
 

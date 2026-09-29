@@ -306,35 +306,7 @@ export function dashaWindows(
   const horizon = fromMs + years * YEAR_MS;
   const out: DashaWindow[] = [];
 
-  const relevanceOf = (lord: PlanetId): { score: number; reasons: string[] } => {
-    const reasons: string[] = [];
-    let score = 0;
-    const rules = rulesHouses(kundli.lagna.sign, lord).filter((h) => houses.includes(h));
-    if (rules.length) {
-      score += 45;
-      reasons.push(`rules H${rules.join("/")}`);
-    }
-    const pos = kundli.planets.find((p) => p.id === lord)!;
-    if (houses.includes(pos.house)) {
-      score += 30;
-      reasons.push(`sits in H${pos.house}`);
-    }
-    if (karakas.includes(lord)) {
-      score += 25;
-      reasons.push("natural karaka");
-    }
-    const st = strengthScore({
-      dignity: pos.dignity,
-      combust: pos.combust,
-      retrograde: pos.retrograde,
-      house: pos.house,
-      planet: pos.id,
-    });
-    score += Math.round((st - 50) / 4);
-    if (st >= 60) reasons.push(`strong (${pos.dignity})`);
-    if (st <= 40) reasons.push(`weak (${pos.dignity})`);
-    return { score: Math.max(0, Math.min(100, score)), reasons };
-  };
+  const relevanceOf = (lord: PlanetId) => lordRelevance(kundli, lord, houses, karakas);
 
   for (const md of kundli.dasha) {
     if (md.end < fromMs || md.start > horizon || !md.children) continue;
@@ -460,15 +432,19 @@ export function muhurtaPicks(
   fromMs: number,
   days: number,
   tzOffsetMinutes: number,
-  count = 5
+  count = 5,
+  where?: { latitude: number; longitude: number }
 ): FavourableWindow[] {
+  // The whole scope is scanned (a year is ~13 month grids) — capping this
+  // at 60 days used to hide every muhurta after the second month.
   const scan = personalDayWindows(
     kundli,
     houses,
     karakas,
     fromMs,
-    Math.min(days, 60),
-    tzOffsetMinutes
+    Math.min(days, 366),
+    tzOffsetMinutes,
+    where
   );
   const best = bestDays(scan, count);
   return best.length ? best : scan.sort((a, b) => b.score - a.score).slice(0, count);
@@ -517,7 +493,8 @@ export function runPrecisionFunnel(
   houses: number[],
   karakas: PlanetId[],
   scope: TimeScope,
-  tzOffsetMinutes: number
+  tzOffsetMinutes: number,
+  where?: { latitude: number; longitude: number }
 ): PrecisionFunnel {
   const fromMs = scope.fromMs;
   const toMs = fromMs + scope.days * DAY_MS;
@@ -545,11 +522,11 @@ export function runPrecisionFunnel(
   const picks = scope.kind === "daily" ? 1 : scope.kind === "weekly" ? 7 : scope.kind === "monthly" ? 6 : 10;
   const step5 =
     scope.kind === "daily" || scope.kind === "weekly"
-      ? personalDayWindows(kundli, houses, karakas, fromMs, scope.days, tzOffsetMinutes).slice(
+      ? personalDayWindows(kundli, houses, karakas, fromMs, scope.days, tzOffsetMinutes, where).slice(
           0,
           scope.days
         )
-      : muhurtaPicks(kundli, houses, karakas, fromMs, scope.days, tzOffsetMinutes, picks);
+      : muhurtaPicks(kundli, houses, karakas, fromMs, scope.days, tzOffsetMinutes, picks, where);
 
   return { scope, step1, step2, step3, step4, step5 };
 }

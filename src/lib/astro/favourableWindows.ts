@@ -145,9 +145,13 @@ export function personalDayWindows(
   karakas: PlanetId[],
   fromMs: number,
   days: number,
-  tzOffsetMinutes: number
+  tzOffsetMinutes: number,
+  /** where the native is NOW — sunrise-based clock windows follow this */
+  where?: { latitude: number; longitude: number }
 ): FavourableWindow[] {
   const moon = kundli.planets.find((p) => p.id === "Moon")!;
+  const lat = where?.latitude ?? kundli.birth.latitude;
+  const lon = where?.longitude ?? kundli.birth.longitude;
   const start = new Date(fromMs);
   const out: FavourableWindow[] = [];
 
@@ -159,8 +163,8 @@ export function personalDayWindows(
     const month = buildMonthCalendar(
       cursorYear,
       cursorMonth,
-      kundli.birth.latitude,
-      kundli.birth.longitude,
+      lat,
+      lon,
       tzOffsetMinutes
     );
     for (const d of month) {

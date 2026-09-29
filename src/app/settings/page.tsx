@@ -6,11 +6,14 @@ import { useI18n } from "@/lib/i18n";
 import { db, getSetting, setSetting } from "@/lib/db";
 import { setAiSetting, fmtCost, fmtDuration, fmtUntil } from "@/lib/aiClient";
 import { useAiQuota } from "@/lib/useAiQuota";
+import { CitySearch } from "@/components/forms/CitySearch";
+import { useCurrentPlace, setCurrentPlace } from "@/lib/place";
 
 export default function SettingsPage() {
   const { t, lang, setLang } = useI18n();
   const [chartStyle, setChartStyle] = useState<"north" | "south">("north");
   const { cfg, usage, refresh } = useAiQuota();
+  const here = useCurrentPlace();
   const [keyInput, setKeyInput] = useState("");
   const [message, setMessage] = useState("");
   const [keyMessage, setKeyMessage] = useState("");
@@ -60,11 +63,40 @@ export default function SettingsPage() {
     try {
       const data = JSON.parse(await file.text());
       if (!Array.isArray(data.profiles)) throw new Error("bad file");
+      // Re-importing the same backup must not duplicate profiles: match on
+      // name + birth moment + place, and remap Q&A history to the local ids.
+      const existing = await db.profiles.toArray();
+      const keyOf = (p: { name: string; localDateTime: string; latitude: number; longitude: number }) =>
+        `${p.name}|${p.localDateTime}|${p.latitude.toFixed(3)}|${p.longitude.toFixed(3)}`;
+      const localIdByKey = new Map(existing.map((p) => [keyOf(p), p.id!]));
+      const idMap = new Map<number, number>();
+      let added = 0;
       for (const p of data.profiles) {
-        const { id: _id, ...rest } = p;
-        await db.profiles.add(rest);
+        const { id: oldId, ...rest } = p;
+        const k = keyOf(rest);
+        let localId = localIdByKey.get(k);
+        if (localId === undefined) {
+          localId = (await db.profiles.add(rest)) as number;
+          localIdByKey.set(k, localId);
+          added++;
+        }
+        if (typeof oldId === "number") idMap.set(oldId, localId);
       }
-      setMessage(`✓ Imported ${data.profiles.length} profiles`);
+      let qa = 0;
+      if (Array.isArray(data.qaHistory)) {
+        const seen = new Set((await db.qaHistory.toArray()).map((h) => `${h.profileId}|${h.createdAt}|${h.question}`));
+        for (const h of data.qaHistory) {
+          const pid = idMap.get(h.profileId);
+          if (pid === undefined) continue;
+          const key = `${pid}|${h.createdAt}|${h.question}`;
+          if (seen.has(key)) continue;
+          const { id: _qid, ...row } = h;
+          await db.qaHistory.add({ ...row, profileId: pid });
+          seen.add(key);
+          qa++;
+        }
+      }
+      setMessage(`✓ Imported ${added} new profile(s), ${qa} saved answer(s)`);
     } catch {
       setMessage("✕ Invalid backup file");
     }
@@ -118,6 +150,39 @@ export default function SettingsPage() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Where the user is now — drives sunrise-based timings */}
+        <div className="card space-y-3 p-5">
+          <div>
+            <h2 className="font-medium text-(--color-gold-soft)">
+              📍 {lang === "hi" ? "आप अभी कहाँ हैं" : "Where you are now"}
+            </h2>
+            <p className="mt-1 text-xs text-(--color-ink-soft)">
+              {lang === "hi"
+                ? "राहु काल, अभिजीत, चौघड़िया, पंचांग और दिन-फल स्थानीय सूर्योदय से बनते हैं — यह आपके वर्तमान शहर का होना चाहिए, जन्म स्थान का नहीं।"
+                : "Rahu Kaal, Abhijit, choghadiya, panchang and day scores depend on local sunrise — they must use the city you live in now, not your birth place."}
+            </p>
+          </div>
+          <CitySearch
+            value={here?.place ?? ""}
+            onPick={(c) => void setCurrentPlace(c)}
+          />
+          <p className="text-xs text-(--color-ink-soft)">
+            {here
+              ? `✓ ${here.place} · ${here.latitude.toFixed(2)}°, ${here.longitude.toFixed(2)}°`
+              : lang === "hi"
+                ? "सेट नहीं — जन्म स्थान प्रयोग हो रहा है।"
+                : "Not set — each profile's birth place is used instead."}
+            {here && (
+              <button
+                onClick={() => void setCurrentPlace(null)}
+                className="ml-2 underline"
+              >
+                {lang === "hi" ? "हटाएँ" : "clear"}
+              </button>
+            )}
+          </p>
         </div>
 
         {/* ── AI control panel ─────────────────────────────────── */}

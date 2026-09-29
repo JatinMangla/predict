@@ -25,6 +25,7 @@ import {
 } from "@/lib/astro/hinduCalendar";
 import { DayTimingsCard } from "@/components/DayTimingsCard";
 import { computePanchang } from "@/lib/astro/panchang";
+import { useCurrentPlace, placeOrFallback } from "@/lib/place";
 import { activeDashas } from "@/lib/astro/dasha";
 import { VARA_NAMES } from "@/lib/astro/constants";
 import { nakshatraName, planetName, tithiName } from "@/lib/format";
@@ -41,17 +42,20 @@ export default function PersonalCalendarPage({
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
   const [selected, setSelected] = useState<CalendarDayInfo | null>(null);
+  // Day timings follow where the native is now, not the birth place
+  const here = useCurrentPlace();
+  const place = useMemo(() => (profile ? placeOrFallback(here, profile) : null), [here, profile]);
 
   const days = useMemo(() => {
-    if (!profile) return [];
+    if (!place) return [];
     return buildMonthCalendar(
       year,
       month,
-      profile.latitude,
-      profile.longitude,
+      place.latitude,
+      place.longitude,
       new Date(year, month, 15).getTimezoneOffset()
     );
-  }, [year, month, profile]);
+  }, [year, month, place]);
 
   const lunar = useMemo(
     () => lunarMonthInfo(Date.UTC(year, month, 15, 12)),
@@ -65,11 +69,11 @@ export default function PersonalCalendarPage({
   }, [kundli]);
 
   const selectedPanchang = useMemo(() => {
-    if (!selected || !profile) return null;
+    if (!selected || !place) return null;
     const d = new Date(selected.dayStartMs + 12 * 3600 * 1000);
     const localDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    return computePanchang(selected.refMs, profile.latitude, profile.longitude, localDate);
-  }, [selected, profile]);
+    return computePanchang(selected.refMs, place.latitude, place.longitude, localDate);
+  }, [selected, place]);
 
   if (loading) return <AppShell><p className="p-8 text-center text-(--color-ink-soft)">{t("loading")}</p></AppShell>;
   if (error || !kundli || !profile || !natal) {

@@ -7,7 +7,8 @@ import { YOGA_MEANINGS } from "@/lib/interpret/kb/yogaMeanings";
 export function YogaList({ kundli }: { kundli: Kundli }) {
   const { t, lang } = useI18n();
   const yogas = kundli.yogas.filter((y) => y.kind === "yoga");
-  const doshas = kundli.yogas.filter((y) => y.kind === "dosha");
+  const doshas = kundli.yogas.filter((y) => y.kind === "dosha" && !y.cancelledBy?.length);
+  const cancelled = kundli.yogas.filter((y) => y.kind === "dosha" && y.cancelledBy?.length);
 
   if (kundli.yogas.length === 0) {
     return <p className="text-sm text-(--color-ink-soft)">{t("noYogas")}</p>;
@@ -31,10 +32,15 @@ export function YogaList({ kundli }: { kundli: Kundli }) {
                 : "border-orange-500/30 text-orange-300"
             }`}
           >
-            {strengthLabel(y.strength)}
+            {y.cancelledBy?.length ? (lang === "hi" ? "निरस्त" : "cancelled") : strengthLabel(y.strength)}
           </span>
         </div>
         <p className="mt-1 text-xs text-(--color-ink-soft)">{y.detail}</p>
+        {y.cancelledBy?.length ? (
+          <p className="mt-1.5 text-xs text-emerald-300">
+            ✓ {lang === "hi" ? "निरस्त (भंग) —" : "Cancelled (bhanga) —"} {y.cancelledBy.join("; ")}
+          </p>
+        ) : null}
         {kb && (
           <p className="mt-2 text-sm leading-relaxed">
             {lang === "hi" ? kb.meaning.hi : kb.meaning.en}
@@ -65,6 +71,23 @@ export function YogaList({ kundli }: { kundli: Kundli }) {
           </h3>
           <div className="grid gap-3 md:grid-cols-2">
             {doshas.map((y, i) => (
+              <Card key={i} y={y} />
+            ))}
+          </div>
+        </section>
+      )}
+      {cancelled.length > 0 && (
+        <section>
+          <h3 className="mb-3 text-sm font-medium uppercase tracking-wider text-(--color-ink-soft)">
+            {lang === "hi" ? "निरस्त दोष" : "Cancelled doshas"} ({cancelled.length})
+          </h3>
+          <p className="mb-3 text-xs text-(--color-ink-soft)">
+            {lang === "hi"
+              ? "ये दोष कुंडली में बनते हैं, पर शास्त्रीय भंग-नियमों से निष्प्रभावी हो जाते हैं।"
+              : "These form in the chart but are neutralised by classical cancellation rules — not active threats."}
+          </p>
+          <div className="grid gap-3 opacity-80 md:grid-cols-2">
+            {cancelled.map((y, i) => (
               <Card key={i} y={y} />
             ))}
           </div>

@@ -2,7 +2,10 @@
 // Strategy: cache-first for hashed static assets (immutable), network-first
 // with cache fallback for pages, so the app keeps working without internet.
 
-const CACHE = "kundli-predict-v1";
+// Bump on releases that change caching so old build assets are evicted.
+const CACHE = "kundli-predict-v2";
+/** On a slow or flaky connection, fall back to the cached page after this long */
+const NETWORK_TIMEOUT_MS = 4000;
 const OFFLINE_URLS = ["/", "/manifest.webmanifest", "/icons/icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -50,25 +53,37 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Pages and other assets: network-first, fall back to cache
+  // Pages and other assets: network-first. If the network is slow and a
+  // cached copy exists, serve that after NETWORK_TIMEOUT_MS; with nothing
+  // cached, keep waiting for the network rather than failing.
   event.respondWith(
-    fetch(request)
-      .then((res) => {
+    (async () => {
+      const network = fetch(request).then((res) => {
         if (res.ok) {
           const copy = res.clone();
           caches.open(CACHE).then((cache) => cache.put(request, copy));
         }
         return res;
-      })
-      .catch(async () => {
+      });
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("timeout")), NETWORK_TIMEOUT_MS)
+      );
+      try {
+        return await Promise.race([network, timeout]);
+      } catch {
         const cached = await caches.match(request);
         if (cached) return cached;
-        // Last resort for navigations: the cached shell
-        if (request.mode === "navigate") {
-          const shell = await caches.match("/");
-          if (shell) return shell;
+        try {
+          return await network;
+        } catch {
+          // Last resort for navigations: the cached shell
+          if (request.mode === "navigate") {
+            const shell = await caches.match("/");
+            if (shell) return shell;
+          }
+          return Response.error();
         }
-        return Response.error();
-      })
+      }
+    })()
   );
 });

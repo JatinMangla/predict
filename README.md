@@ -1,72 +1,71 @@
 # Kundli Predict 🪐
 
-An **offline-first Vedic astrology web application**. Feed in birth details and get a complete kundli — charts, dashas, yogas, ashtakavarga, panchang, numerology — plus rule-based answers to life questions, weekly/monthly/yearly predictions, and personalised transit (gochar) analysis. Everything is computed **on your device with no internet or AI required**; AI (Claude → Gemini) is used only as an optional fallback.
+A private Vedic astrology web app. Enter birth details and get a complete, correctly computed kundli, then AI readings that interpret **your** chart: questions and answers, life-area forecasts with exact dates and clock times, precision timing, Kundli Milan, numerology and a personal panchang calendar.
 
-## Features
+All astronomy runs **in the browser, offline**. The AI (Claude, falling back to Gemini) is only ever given the computed chart to interpret; it never does the calculation.
 
-- **Complete Kundli** — Lahiri (Chitrapaksha) sidereal positions from the `astronomy-engine` ephemeris (arc-minute accuracy), lagna, whole-sign houses, 10 divisional charts (D1–D60), nakshatras & padas, dignities, combustion, retrogression.
-- **North & South Indian chart styles** (toggle).
-- **Vimshottari Dasha** — full Maha/Antar/Pratyantar timeline with an expandable UI.
-- **Panchang** — tithi, vara, nakshatra, yoga, karana, sunrise/sunset.
-- **30+ Yogas & Doshas** — Gajakesari, Panch Mahapurusha, Raja/Dhana yogas, Vipreet Raja, Neecha Bhanga, Manglik, Kaal Sarp, Sade Sati and more, each with bilingual meaning.
-- **Ashtakavarga** — full Parashari BAV/SAV bindu tables used for transit scoring.
-- **Q&A engine** — ask about career, marriage, wealth, health, education, children, property, foreign travel… answered *from the chart itself* (house lords, karakas, active dashas, timing windows) with a confidence score. Works fully offline.
-- **Predictions** — weekly / monthly / yearly, generated from active dashas + live transits + chandra bala + Sade Sati + ashtakavarga + numerology personal year.
-- **Transits (Gochar)** — current sky positions relative to your Moon, plus a 12-month timeline of sign ingresses and retrograde stations with personal effects.
-- **Numerology** — Moolank, Bhagyank, name numbers, personal year/month; the UI **theme adapts to the profile's birthday number** (each number's ruling planet has its own colour).
-- **Bilingual** — full English / हिंदी toggle.
-- **Offline city database** — 36,000+ cities (every Indian town ≥ 5k population) with coordinates and timezone; no geocoding API.
-- **AI fallback (optional)** — when the rule engine's confidence is low, or on demand via "Ask AI": Anthropic Claude first, Google Gemini (free tier) as fallback. The app never *requires* AI.
-- **Private by design** — profiles live in your browser (IndexedDB); login restricted to a single Google account; strict CSP and security headers; API keys server-side only.
-- **PWA** — installable, works offline after first load.
+## What it computes (offline)
 
-## Tech Stack
+| Area | Detail |
+|---|---|
+| **Chart** | Lahiri (true Chitrapaksha) sidereal positions from `astronomy-engine`, nutation-corrected; lagna; whole-sign houses; degree-aware dignities (BPHS); combustion; retrogression |
+| **Vargas** | 16 divisional charts: D1 D2 D3 D4 D7 D9 D10 D12 D16 D20 D24 D27 D30 D40 D45 D60 |
+| **Dashas** | Vimshottari (Maha / Antar / Pratyantar) **and** Yogini dasha for cross-checking |
+| **Jaimini** | Chara karakas (AK…DK) and karakamsa |
+| **Yogas & doshas** | 40+ with **classical cancellations** (Manglik from lagna/Moon/Venus with exceptions, Kemadruma bhanga, Nadi/Bhakoot exceptions…); cancelled doshas are shown as cancelled, not as threats |
+| **Ashtakavarga** | Parashari BAV / SAV, used to weight every transit |
+| **Transits** | Lagna-based gochar judgement (house from lagna + functional rulership + own bindus + running dasha), with Chandra-kundli as a second reference |
+| **Shani** | Full Sade Sati and Dhaiya (Kantaka / Ashtama) timeline with exact dates |
+| **Kundli Milan** | Ashtakoota 36 gunas, Nadi/Bhakoot/Gana cancellations, Manglik parity, Rajju and Vedha |
+| **Numerology** | Pythagorean core numbers; **Chaldean (Cheiro)** name number with compound meanings and a name-compatibility check; **Lo Shu grid** with planes and missing numbers; **Kua**; pinnacles and challenges; personal year/month/day |
+| **Panchang** | Tithi, vara, nakshatra, yoga, karana; Amanta month with **Adhika masa**; Vikram Samvat; 30+ festivals (nishita rule for night festivals); Rahu Kaal, Yamaganda, Gulika, Abhijit; **choghadiya and hora** |
+| **Precision timing** | Classical five-step funnel: birth-time confidence → natal promise → dasha → gochara → muhurta |
+| **Gemstones** | Suitability judged from functional rulership for **your lagna**, not the birthday |
 
-Next.js 15 (App Router) · TypeScript · Tailwind CSS 4 · astronomy-engine · luxon · Dexie (IndexedDB) · Auth.js v5 (Google) · Vitest (38 engine tests) · Vercel
+## AI readings
 
-## Local Development
+- Answers **stream** as they are written, render as formatted text, and **follow-up questions remember the conversation**.
+- Saved answers reopen without spending quota.
+- The prompt carries the full chart: D1 with degrees and nakshatras, house lords, D9/D10, SAV, running and upcoming dashas, Yogini dasha, chara karakas, Sade Sati dates, transits judged from the lagna, and numerology.
+- Modes: open question, life-area reading, date-and-time plan, "verify someone else's forecast against my chart", and match.
+- Provider order: **Claude Opus 5.5** (adaptive thinking, server-side refusal fallback) → **Gemini Flash** free tier. There is a real quota meter for Gemini's free limit.
+
+## Location
+
+Timings depend on local sunrise. Set **Settings → Where you are now** so Rahu Kaal, choghadiya, panchang and day scores use the city you live in; the birth place drives only the natal chart.
+
+## Tech stack
+
+Next.js 15 (App Router) · TypeScript · Tailwind CSS 4 · astronomy-engine · luxon · Dexie (IndexedDB) · Auth.js v5 (Google) · Vitest · Vercel
+
+## Local development
 
 ```bash
 npm install
-cp .env.example .env.local   # fill in the values (see below)
+cp .env.example .env.local   # fill in the values
 npm run dev                  # http://localhost:3000
 npm test                     # engine test suite
 ```
 
-## Environment Variables
+## Environment variables
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `AUTH_SECRET` | ✅ | Session encryption — generate with `openssl rand -base64 32` |
-| `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | ✅ | Google OAuth credentials (steps below) |
-| `ALLOWED_EMAIL` | — | The only email allowed to sign in (default `jatinmangla123@gmail.com`) |
-| `ANTHROPIC_API_KEY` | optional | Claude AI fallback ([console.anthropic.com](https://console.anthropic.com)) |
-| `GEMINI_API_KEY` | optional | Gemini free-tier fallback ([aistudio.google.com/apikey](https://aistudio.google.com/apikey)) |
+| `AUTH_SECRET` | ✅ | Session encryption (`openssl rand -base64 32`) |
+| `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | ✅ | Google OAuth credentials |
+| `ALLOWED_EMAIL` | — | The only email allowed to sign in |
+| `ANTHROPIC_API_KEY` | optional | Claude readings |
+| `GEMINI_API_KEY` | optional | Gemini free-tier readings (a key can also be stored per browser in Settings) |
 
-### Google OAuth setup (one-time, ~5 minutes)
+Google OAuth: create a Web OAuth client, add `http://localhost:3000/api/auth/callback/google` and `https://YOUR-APP.vercel.app/api/auth/callback/google` as redirect URIs, and keep the consent screen in *Testing* with only your account as a test user.
 
-1. Go to [console.cloud.google.com](https://console.cloud.google.com) → create a project (e.g. "Kundli Predict").
-2. **APIs & Services → OAuth consent screen** → External → fill app name & your email → add `jatinmangla123@gmail.com` as a **test user** (keeping the app in "Testing" mode means *only* test users can ever sign in — a second security layer).
-3. **APIs & Services → Credentials → Create Credentials → OAuth client ID** → Web application.
-4. Add **Authorized redirect URIs**:
-   - `http://localhost:3000/api/auth/callback/google`
-   - `https://YOUR-APP.vercel.app/api/auth/callback/google` (add after the first deploy)
-5. Copy the Client ID / Client Secret into `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`.
+## Accuracy notes
 
-## Deploy to Vercel
+- **Ayanamsa:** Lahiri per the ICRC definition (23°15′00.658″ at 1956-03-21.0 ET + IAU-2006 precession), with nutation removed from true-of-date positions (the Swiss Ephemeris / Drik Panchang convention).
+- **Ascendant:** tested against the sunrise identity (the Sun is on the ascendant at sunrise and on the descendant at sunset) at two locations.
+- **Vara:** the Vedic day runs from sunrise to sunrise; sunrise is searched for the civil date itself, so late-evening births keep their weekday.
+- **Lunar months:** exact new-moon boundaries; an Amanta month without a sankranti is Adhika and holds no festivals (checked against Adhika Jyeshtha 2026).
+- **Rahu/Ketu:** mean node. **Houses:** whole sign. **Dasha year:** 365.25 days.
+- Validated by 140+ unit tests against known astronomical and panchang reference points (sankranti dates, documented full and new moons, Sade Sati dates, ashtakavarga totals, textbook guna scores, Kua tables).
 
-1. Push this repo to GitHub (`https://github.com/JatinMangla`).
-2. In [vercel.com](https://vercel.com/jatinmanglas-projects) → **Add New → Project** → import the repo (defaults are fine — Next.js is auto-detected).
-3. In **Project → Settings → Environment Variables**, add all the variables above.
-4. Deploy, note the production URL, and add its callback URL to the Google OAuth client (step 4 above).
-
-## Accuracy Notes
-
-- Ayanamsa: Lahiri per the official ICRC definition (23°15′00.658″ at 1956-03-21.0 ET + IAU-2006 precession) — matches Swiss-Ephemeris/Drik-Panchang values to arcseconds.
-- Rahu/Ketu: mean node (classical Lahiri-ephemeris convention).
-- Houses: whole-sign (Vedic standard). Dasha year: 365.25 days.
-- The engine is validated by unit tests against known astronomical reference points (J2000 solar longitude, sankranti dates, documented full/new moons, ascendant-at-sunrise identity, classical ashtakavarga totals).
-
----
-
-Built with ❤️ and the stars. Jai Shri Ganesha 🙏
+Astrology is a traditional interpretive system, not a predictive science. Treat the readings as reflection and guidance, never as a substitute for medical, legal or financial advice.

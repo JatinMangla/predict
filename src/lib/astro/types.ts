@@ -109,6 +109,11 @@ export interface YogaResult {
   detail: string;
   /** strength 1 (weak) – 3 (strong) */
   strength: 1 | 2 | 3;
+  /**
+   * Classical cancellation (bhanga) conditions present in this chart. A dosha
+   * with any entry here is shown as cancelled rather than as an active threat.
+   */
+  cancelledBy?: string[];
 }
 
 export interface AshtakavargaResult {

@@ -71,6 +71,16 @@ describe("ephemeris", () => {
 });
 
 describe("panchang", () => {
+  it("keeps the weekday for a 22:30 birth (the Vedic day runs to the NEXT sunrise)", () => {
+    // Wednesday 12 Jun 2024, 22:30 IST
+    const p = computePanchang(Date.UTC(2024, 5, 12, 17, 0), 28.61, 77.21, "2024-06-12");
+    expect(p.vara).toBe(3);
+    expect(p.sunrise!.slice(0, 10)).toBe("2024-06-11"); // 05:23 IST on the 12th
+  });
+  it("uses the previous weekday before sunrise", () => {
+    const p = computePanchang(Date.UTC(2024, 5, 11, 23, 0), 28.61, 77.21, "2024-06-12");
+    expect(p.vara).toBe(2);
+  });
   it("tithi is Purnima a few hours before the 25 Jan 2024 full moon (17:54 UT)", () => {
     const p = computePanchang(Date.UTC(2024, 0, 25, 10, 0), 28.61, 77.21, "2024-01-25");
     expect(p.tithi).toBe(14); // Purnima
@@ -91,15 +101,34 @@ describe("panchang", () => {
 });
 
 describe("ascendant", () => {
-  it("equals the Sun's longitude at sunrise (within a few degrees)", () => {
-    // Delhi, 21 Jun 2024 — at sunrise the rising point IS the Sun.
+  // At sunrise the rising point IS the Sun; at sunset the Sun is on the
+  // descendant. (An earlier version of this test compared the ascendant with
+  // the Sun + 180°, which let a 180° lagna error pass unnoticed.)
+  const angDist = (a: number, b: number) => {
+    const d = Math.abs(((a - b) % 360 + 360) % 360);
+    return Math.min(d, 360 - d);
+  };
+  it("equals the Sun's longitude at sunrise (Delhi, 21 Jun 2024)", () => {
     const rs = sunriseSunset(Date.UTC(2024, 5, 21, 6, 0), 28.61, 77.21);
     expect(rs.sunrise).toBeDefined();
     const asc = ascendantSidereal(rs.sunrise!, 28.61, 77.21);
     const sun = siderealLongitude("Sun", rs.sunrise!);
-    const diff = Math.abs(((asc - sun + 540) % 360) - 180 + 180) % 360;
-    const delta = Math.min(diff, 360 - diff);
-    expect(delta).toBeLessThan(6);
+    // refraction + semidiameter put the Sun ~0.8° below the geometric horizon
+    expect(angDist(asc, sun)).toBeLessThan(2);
+  });
+  it("is opposite the Sun at sunset (New York, 10 Dec 2023)", () => {
+    const rs = sunriseSunset(Date.UTC(2023, 11, 10, 17, 0), 40.71, -74.0);
+    expect(rs.sunset).toBeDefined();
+    const asc = ascendantSidereal(rs.sunset!, 40.71, -74.0);
+    const sun = siderealLongitude("Sun", rs.sunset!);
+    expect(angDist(asc, sun + 180)).toBeLessThan(2.5);
+  });
+  it("Delhi 15 Jan 1990 10:30 IST rises in early Pisces", () => {
+    const k = computeKundli({
+      name: "R", gender: "male", localDateTime: "1990-01-15T10:30",
+      timezone: "Asia/Kolkata", latitude: 28.6139, longitude: 77.209, place: "Delhi",
+    });
+    expect(k.lagna.sign).toBe(11);
   });
   it("advances through all 12 signs over 24 hours", () => {
     const base = Date.UTC(2024, 2, 21, 0, 0);

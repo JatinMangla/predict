@@ -20,6 +20,7 @@ import {
   type CalendarDayInfo,
 } from "@/lib/astro/hinduCalendar";
 import { computePanchang } from "@/lib/astro/panchang";
+import { useCurrentPlace } from "@/lib/place";
 import { SIGN_NAMES, VARA_NAMES } from "@/lib/astro/constants";
 import { nakshatraName, tithiName } from "@/lib/format";
 
@@ -30,14 +31,18 @@ export default function CalendarPage() {
   const [month, setMonth] = useState(now.getMonth()); // 0–11
   const [selected, setSelected] = useState<CalendarDayInfo | null>(null);
 
-  // Sunrise location: first saved profile's birthplace, else Delhi
+  // Sunrise location: where you are now (Settings), else the first saved
+  // profile's birthplace, else Delhi
   const profiles = useLiveQuery(() => db.profiles.toArray(), []);
+  const here = useCurrentPlace();
   const place = useMemo(
     () =>
-      profiles?.[0]
-        ? { lat: profiles[0].latitude, lon: profiles[0].longitude }
-        : { lat: 28.6139, lon: 77.209 },
-    [profiles]
+      here
+        ? { lat: here.latitude, lon: here.longitude }
+        : profiles?.[0]
+          ? { lat: profiles[0].latitude, lon: profiles[0].longitude }
+          : { lat: 28.6139, lon: 77.209 },
+    [profiles, here]
   );
 
   const days = useMemo(

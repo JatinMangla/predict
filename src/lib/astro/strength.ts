@@ -16,12 +16,16 @@ export function dignityOf(planet: PlanetId, siderealLon: number): Dignity {
   const degInSign = siderealLon % 30;
 
   const ex = EXALTATION[planet];
+  const mt = MOOLATRIKONA[planet];
   if (ex) {
-    if (sign === ex.sign) return "exalted";
+    // Where the moolatrikona lies in the exaltation sign itself (Moon in
+    // Taurus, Mercury in Virgo) exaltation covers only the degrees up to the
+    // deepest point; beyond it the planet is in moolatrikona / own sign (BPHS).
+    const sharesSign = mt !== undefined && mt.sign === ex.sign;
+    if (sign === ex.sign && (!sharesSign || degInSign < ex.deg)) return "exalted";
     if (sign === (ex.sign + 6) % 12) return "debilitated";
   }
 
-  const mt = MOOLATRIKONA[planet];
   if (mt && sign === mt.sign && degInSign >= mt.from && degInSign <= mt.to) {
     return "moolatrikona";
   }

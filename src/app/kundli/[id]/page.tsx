@@ -17,6 +17,8 @@ import { YogaList } from "@/components/kundli/YogaList";
 import { AshtakavargaGrid } from "@/components/kundli/AshtakavargaGrid";
 import { PanchangCard } from "@/components/kundli/PanchangCard";
 import { NumerologyCard } from "@/components/kundli/NumerologyCard";
+import { NumerologyPlus } from "@/components/kundli/NumerologyPlus";
+import { AdvancedPanel } from "@/components/kundli/AdvancedPanel";
 import { planetReading } from "@/lib/interpret/reading";
 import { VARGA_LIST } from "@/lib/astro/vargas";
 import { getSetting, setSetting } from "@/lib/db";
@@ -27,7 +29,7 @@ import {
   signName,
 } from "@/lib/format";
 
-type Tab = "charts" | "planets" | "vargas" | "dashas" | "yogas" | "av" | "num";
+type Tab = "charts" | "planets" | "vargas" | "dashas" | "yogas" | "av" | "num" | "adv";
 
 export default function KundliPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -71,6 +73,7 @@ export default function KundliPage({ params }: { params: Promise<{ id: string }>
     { key: "yogas", label: t("yogasTab") },
     { key: "av", label: t("ashtakavargaTab") },
     { key: "num", label: t("numerologyTab") },
+    { key: "adv", label: lang === "hi" ? "उन्नत" : "Advanced" },
   ];
 
   return (
@@ -98,6 +101,8 @@ export default function KundliPage({ params }: { params: Promise<{ id: string }>
             <Link href={`/transits/${id}`} className="accent-bg rounded-md px-3 py-1.5">{t("transits")}</Link>
             <Link href={`/ask/${id}`} className="accent-bg rounded-md px-3 py-1.5">{t("askQuestion")}</Link>
             <Link href={`/calendar/${id}`} className="accent-bg rounded-md px-3 py-1.5">{t("calendarNav")}</Link>
+            <Link href={`/match?groom=${id}`} className="accent-bg rounded-md px-3 py-1.5">💞 {lang === "hi" ? "कुंडली मिलान" : "Match"}</Link>
+            <Link href={`/edit/${id}`} className="rounded-md border border-(--color-line) px-3 py-1.5 text-(--color-ink-soft)">✎ {lang === "hi" ? "संपादित करें" : "Edit"}</Link>
           </div>
         </div>
 
@@ -186,7 +191,13 @@ export default function KundliPage({ params }: { params: Promise<{ id: string }>
         {tab === "dashas" && <DashaTimeline kundli={kundli} />}
         {tab === "yogas" && <YogaList kundli={kundli} />}
         {tab === "av" && <AshtakavargaGrid kundli={kundli} />}
-        {tab === "num" && <NumerologyCard numerology={kundli.numerology} />}
+        {tab === "num" && (
+          <div className="space-y-5">
+            <NumerologyCard numerology={kundli.numerology} />
+            <NumerologyPlus numerology={kundli.numerology} profile={profile} />
+          </div>
+        )}
+        {tab === "adv" && <AdvancedPanel kundli={kundli} />}
       </AppShell>
     </ProfileTheme>
   );

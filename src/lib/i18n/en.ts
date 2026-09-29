@@ -290,7 +290,7 @@ export const en = {
   freeCallsLeft: "free AI calls left today",
   aiQuotaExhausted: "Gemini's free daily quota is used up (Google's actual limit). It resets at midnight US-Pacific time (~12:30 PM IST).",
   aiThrottled: "Too many AI calls in the last minute (Google's per-minute limit). Wait a moment and try again — your daily quota is untouched.",
-  quotaNote: "Counted against Google's real free limit (250/day for Gemini 2.5 Flash), reconciled between this device and the server.",
+  quotaNote: "Counted against Google's real free limit (250/day for Gemini Flash), reconciled between this device and the server.",
   quotaResetsIn: "Resets in",
   quotaSynced: "Checked",
   quotaNeverSynced: "Not checked yet — offline",

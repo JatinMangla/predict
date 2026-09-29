@@ -4,7 +4,8 @@
 import { norm360 } from "./constants";
 
 export type VargaKey =
-  | "D1" | "D2" | "D3" | "D4" | "D7" | "D9" | "D10" | "D12" | "D30" | "D60";
+  | "D1" | "D2" | "D3" | "D4" | "D7" | "D9" | "D10" | "D12"
+  | "D16" | "D20" | "D24" | "D27" | "D30" | "D40" | "D45" | "D60";
 
 export const VARGA_LIST: { key: VargaKey; name: string; signifies: string }[] = [
   { key: "D1", name: "Rasi", signifies: "Overall life" },
@@ -15,7 +16,13 @@ export const VARGA_LIST: { key: VargaKey; name: string; signifies: string }[] = 
   { key: "D9", name: "Navamsa", signifies: "Marriage, dharma" },
   { key: "D10", name: "Dasamsa", signifies: "Career" },
   { key: "D12", name: "Dwadasamsa", signifies: "Parents" },
+  { key: "D16", name: "Shodasamsa", signifies: "Vehicles, comforts" },
+  { key: "D20", name: "Vimsamsa", signifies: "Spiritual progress" },
+  { key: "D24", name: "Chaturvimsamsa", signifies: "Learning, education" },
+  { key: "D27", name: "Bhamsa", signifies: "Strengths, weaknesses" },
   { key: "D30", name: "Trimsamsa", signifies: "Misfortunes" },
+  { key: "D40", name: "Khavedamsa", signifies: "Maternal legacy" },
+  { key: "D45", name: "Akshavedamsa", signifies: "Paternal legacy, character" },
   { key: "D60", name: "Shashtiamsa", signifies: "Past karma" },
 ];
 
@@ -24,6 +31,8 @@ export function vargaSign(siderealLon: number, key: VargaKey): number {
   const sign = Math.floor(lon / 30) % 12;
   const deg = lon % 30;
   const isOdd = sign % 2 === 0; // Aries(0) is an odd sign in Vedic counting
+  // modality: 0 movable (chara), 1 fixed (sthira), 2 dual (dwiswabhava)
+  const modality = sign % 3;
 
   switch (key) {
     case "D1":
@@ -77,6 +86,36 @@ export function vargaSign(siderealLon: number, key: VargaKey): number {
       if (deg < 20) return 11;   // Jupiter → Pisces
       if (deg < 25) return 9;    // Saturn → Capricorn
       return 7;                  // Mars → Scorpio
+    }
+    case "D16": {
+      // movable from Aries, fixed from Leo, dual from Sagittarius
+      const part = Math.floor(deg / (30 / 16));
+      return ([0, 4, 8][modality] + part) % 12;
+    }
+    case "D20": {
+      // movable from Aries, fixed from Sagittarius, dual from Leo
+      const part = Math.floor(deg / 1.5);
+      return ([0, 8, 4][modality] + part) % 12;
+    }
+    case "D24": {
+      // odd signs from Leo, even signs from Cancer
+      const part = Math.floor(deg / 1.25);
+      return ((isOdd ? 4 : 3) + part) % 12;
+    }
+    case "D27": {
+      // fire from Aries, earth from Cancer, air from Libra, water from Capricorn
+      const part = Math.floor(deg / (30 / 27));
+      return ([0, 3, 6, 9][sign % 4] + part) % 12;
+    }
+    case "D40": {
+      // odd signs from Aries, even signs from Libra
+      const part = Math.floor(deg / 0.75);
+      return ((isOdd ? 0 : 6) + part) % 12;
+    }
+    case "D45": {
+      // movable from Aries, fixed from Leo, dual from Sagittarius
+      const part = Math.floor(deg / (30 / 45));
+      return ([0, 4, 8][modality] + part) % 12;
     }
     case "D60": {
       // Shashtiamsa: sixty 0.5° parts counted from the sign itself

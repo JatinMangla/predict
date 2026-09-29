@@ -15,6 +15,9 @@ import { currentPositions, sadeSatiPhase } from "@/lib/astro/transits";
 import { judgeTransit, dashaContext } from "@/lib/astro/chartJudgement";
 import { YOGA_MEANINGS } from "@/lib/interpret/kb/yogaMeanings";
 import { fmtDegInSign } from "@/lib/format";
+import { activeYogini, buildYogini, YOGINIS, charaKarakas, KARAKA_NAMES, shaniTimeline } from "@/lib/astro/advanced";
+import { chaldeanCompound } from "@/lib/astro/numerologyPlus";
+import { reduceNumber } from "@/lib/astro/numerology";
 
 function fmtPeriod(startMs: number, endMs: number): string {
   const s = new Date(startMs).toISOString().slice(0, 10);
@@ -22,7 +25,7 @@ function fmtPeriod(startMs: number, endMs: number): string {
   return `${s} to ${e}`;
 }
 
-export function buildKundliSummary(kundli: Kundli) {
+export function buildKundliSummary(kundli: Kundli, currentPlace?: string) {
   const now = Date.now();
   const chain = activeDashas(kundli.dasha, now);
   const dashaStr = chain
@@ -82,6 +85,27 @@ export function buildKundliSummary(kundli: Kundli) {
   const satNow = sky.find((p) => p.id === "Saturn")!;
   const ss = sadeSatiPhase(satNow.sign, natalMoon.sign);
 
+  // Second-opinion systems
+  const yog = activeYogini(buildYogini(natalMoon.longitude, kundli.utcMs), now);
+  const yogini = yog.length
+    ? yog.map((p) => `${YOGINIS[p.yogini].name} (${YOGINIS[p.yogini].lord})`).join(" > ") +
+      (yog[1] ? ` until ${new Date(yog[1].end).toISOString().slice(0, 10)}` : "")
+    : undefined;
+  const ck = charaKarakas(kundli);
+  const karakaLine =
+    ck.karakas.map((k, i) => `${KARAKA_NAMES[i].key}=${k.planet}`).join(", ") +
+    `; karakamsa ${SIGN_NAMES[ck.karakamsa].en}`;
+  const shani = shaniTimeline(natalMoon.sign, now - 8 * 365.25 * 86400000, now + 12 * 365.25 * 86400000);
+  const spanLine = (s: { phase: string; start: number; end: number }) =>
+    `${s.phase} ${new Date(s.start).toISOString().slice(0, 10)} to ${new Date(s.end).toISOString().slice(0, 10)}`;
+  const shaniLine = [
+    ...shani.sadeSati.map((c) => `Sade Sati ${new Date(c.start).toISOString().slice(0, 7)} to ${new Date(c.end).toISOString().slice(0, 7)}`),
+    ...shani.dhaiya.filter((d) => d.end > now).slice(0, 2).map(spanLine),
+  ].join("; ");
+  const n = kundli.numerology;
+  const compound = chaldeanCompound(kundli.birth.name);
+  const numerology = `Moolank ${n.birthdayNumber}, Bhagyank ${n.lifePathNumber}, Chaldean name number ${compound}/${reduceNumber(compound)}, personal year ${n.personalYear}`;
+
   const age = Math.floor(
     (now - kundli.utcMs) / (365.25 * 86400 * 1000)
   );
@@ -116,11 +140,18 @@ export function buildKundliSummary(kundli: Kundli) {
     sadeSati: ss,
     yogas: kundli.yogas.map((y) => {
       const name = YOGA_MEANINGS[y.key]?.name.en ?? y.key;
-      return `${name} (${y.detail})`;
+      return y.cancelledBy?.length
+        ? `${name} (${y.detail}) — CANCELLED by: ${y.cancelledBy.join("; ")}`
+        : `${name} (${y.detail})`;
     }),
     moonNakshatra: `${NAKSHATRA_NAMES[natalMoon.nakshatra].en} pada ${natalMoon.pada}`,
     birthDate: kundli.birth.localDateTime.slice(0, 10),
     gender: kundli.birth.gender,
     ageYears: age,
+    yogini,
+    charaKarakas: karakaLine,
+    shani: shaniLine || undefined,
+    numerology,
+    currentPlace: currentPlace || undefined,
   };
 }

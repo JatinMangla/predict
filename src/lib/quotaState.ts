@@ -14,7 +14,7 @@
 import { createHash } from "crypto";
 import { ptDateStr, ptDayEndMs } from "./ptDay";
 
-/** Gemini 2.5 Flash free tier: requests per day (Google-documented default) */
+/** Gemini Flash free tier: requests per day (Google-documented default) */
 export const GEMINI_FREE_RPD = 250;
 
 /** Real remaining limits, straight from Anthropic's response headers */

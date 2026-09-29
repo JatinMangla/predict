@@ -19,6 +19,8 @@ import {
 } from "@/lib/astro/precisionTiming";
 import { callAi, aiAvailable, aiErrorKey, fmtCost } from "@/lib/aiClient";
 import { useAiQuota } from "@/lib/useAiQuota";
+import { useCurrentPlace } from "@/lib/place";
+import { Markdown } from "@/components/Markdown";
 import { fmtDate, fmtTime, planetName } from "@/lib/format";
 
 const DAY_MS = 86400 * 1000;
@@ -51,9 +53,11 @@ export default function TimingPage({ params }: { params: Promise<{ id: string }>
   const [pickedDate, setPickedDate] = useState(() => isoDate(new Date()));
   const [weekAnchor, setWeekAnchor] = useState(() => weekStart(Date.now()));
   const { cfg, usage } = useAiQuota();
+  const here = useCurrentPlace();
   const [reading, setReading] = useState<{ text: string; provider: string; costUsd: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [live, setLive] = useState("");
 
   const scope = useMemo(() => {
     if (scopeKind === "daily") return { kind: scopeKind, fromMs: dayStart(pickedDate), days: 1 };
@@ -69,9 +73,10 @@ export default function TimingPage({ params }: { params: Promise<{ id: string }>
       category.houses,
       category.karakas,
       scope,
-      new Date().getTimezoneOffset()
+      new Date().getTimezoneOffset(),
+      here ?? undefined
     );
-  }, [kundli, category, scope]);
+  }, [kundli, category, scope, here]);
 
   const canUseAi = cfg !== null && aiAvailable(cfg);
   const quotaExhausted =
@@ -81,6 +86,8 @@ export default function TimingPage({ params }: { params: Promise<{ id: string }>
     if (!kundli || !cfg || !category || !funnel || busy) return;
     setBusy(true);
     setNotice("");
+    setLive("");
+    setReading(null);
     const f = funnel;
     const dashaLines = f.step3
       .map((w) => `${w.mahaLord}-${w.antarLord}: ${new Date(w.startMs).toISOString().slice(0, 10)} to ${new Date(w.endMs).toISOString().slice(0, 10)} (relevance ${w.relevance}/100; ${w.reasons.join("; ")})`)
@@ -110,14 +117,17 @@ export default function TimingPage({ params }: { params: Promise<{ id: string }>
       `STEP 5 — Muhurta candidates:\n${muhurtaLines || "none"}\n\n` +
       `Answer for ${scopeLabel}: (a) does the chart promise this at all and how strongly, (b) which running period drives it and why, (c) the strongest stretch inside the timeframe, (d) the exact date and clock window to act, (e) what to avoid and any precaution. Use the supplied dates and times exactly.`;
 
-    const result = await callAi(question, kundli, lang, cfg, "schedule");
+    const result = await callAi(question, kundli, lang, cfg, "schedule", {
+      onDelta: (d) => setLive((x) => x + d),
+      currentPlace: here?.place,
+    });
     setBusy(false);
     if (typeof result === "string") {
       setNotice(t(aiErrorKey(result)));
       return;
     }
     setReading({ text: result.answer, provider: result.provider, costUsd: result.costUsd });
-  }, [kundli, cfg, category, funnel, busy, lang, t, scopeKind, pickedDate, weekAnchor]);
+  }, [kundli, cfg, category, funnel, busy, lang, t, scopeKind, pickedDate, weekAnchor, here]);
 
   if (loading) return <AppShell><p className="p-8 text-center text-(--color-ink-soft)">{t("loading")}</p></AppShell>;
   if (error || !kundli || !profile) {
@@ -455,7 +465,8 @@ export default function TimingPage({ params }: { params: Promise<{ id: string }>
                     </button>
                   )}
                 </div>
-                {busy && <p className="text-sm text-(--color-ink-soft)">✨ {t("aiThinking")}</p>}
+                {busy && !live && <p className="text-sm text-(--color-ink-soft)">✨ {t("aiThinking")}</p>}
+                {busy && live && <Markdown text={live} />}
                 {notice && <p className="text-sm text-orange-300">{notice}</p>}
                 {!canUseAi && !busy && (
                   <p className="text-sm text-(--color-ink-soft)">
@@ -464,7 +475,7 @@ export default function TimingPage({ params }: { params: Promise<{ id: string }>
                 )}
                 {reading && (
                   <>
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed">{reading.text}</p>
+                    <Markdown text={reading.text} />
                     <p className="mt-3 text-xs text-(--color-ink-soft)">
                       ✨ {reading.provider} · {reading.costUsd === 0 ? t("free") : fmtCost(reading.costUsd)}
                     </p>

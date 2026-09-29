@@ -19,7 +19,7 @@ import { ptDateStr, ptDayStartMs } from "./ptDay";
 import type { Kundli } from "./astro/types";
 import { buildKundliSummary } from "./kundliSummary";
 
-/** Gemini 2.5 Flash free tier: requests per day (Google-documented) */
+/** Gemini Flash free tier: requests per day (Google-documented) */
 export const GEMINI_FREE_RPD = 250;
 
 /** Re-fetch the server's quota figures at least this often */
@@ -241,6 +241,19 @@ export function aiErrorKey(
   return "aiUnavailable";
 }
 
+export type AiMode = "standard" | "rashi" | "verify" | "schedule" | "match";
+
+export interface AiCallOptions {
+  /** receives each chunk of the answer as it is written */
+  onDelta?: (text: string) => void;
+  /** earlier Q&A of this consultation, oldest first (last 4 are sent) */
+  history?: { q: string; a: string }[];
+  /** the second chart for "match" mode */
+  partner?: Kundli;
+  /** where the native lives now, named in the context */
+  currentPlace?: string;
+}
+
 /** Make one AI call; usage recorded for the real-quota meter. */
 export async function callAi(
   question: string,
@@ -248,7 +261,8 @@ export async function callAi(
   lang: "en" | "hi",
   cfg: AiConfig,
   /** "rashi" = personal life-area reading; "verify" = test a pasted forecast */
-  mode: "standard" | "rashi" | "verify" | "schedule" = "standard"
+  mode: AiMode = "standard",
+  opts: AiCallOptions = {}
 ): Promise<AiCallResult | AiCallError> {
   try {
     const headers: Record<string, string> = {
@@ -263,40 +277,78 @@ export async function callAi(
         question,
         lang,
         mode,
-        kundli: buildKundliSummary(kundli),
+        kundli: buildKundliSummary(kundli, opts.currentPlace),
+        ...(opts.partner ? { partner: buildKundliSummary(opts.partner) } : {}),
+        ...(opts.history?.length
+          ? { history: opts.history.slice(-4).map((h) => ({ q: h.q.slice(0, 4000), a: h.a.slice(0, 8000) })) }
+          : {}),
+        stream: true,
       }),
     });
     cache.callsSinceSync += 1;
 
-    if (!res.ok) {
+    if (!res.ok || !res.body) {
       if (res.status === 429) {
-        // Google's real quota signal — the response carries fresh figures
         const data = await res.json().catch(() => null);
         adoptQuota(data?.quota);
-        return data?.error === "provider-throttled"
-          ? "throttled"
-          : "quota-exhausted";
+        return data?.error === "provider-throttled" ? "throttled" : "quota-exhausted";
       }
       void refreshQuota();
       return res.status === 503 ? "unavailable" : "failed";
     }
 
-    const data = await res.json();
-    const costUsd = Number(data?.usage?.costUsd ?? 0);
+    // NDJSON stream: {"type":"delta","text"} … then {"type":"done"|"error"}
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    let answer = "";
+    let final: Record<string, unknown> | null = null;
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let nl: number;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl);
+        buf = buf.slice(nl + 1);
+        if (!line.trim()) continue;
+        const msg = JSON.parse(line) as { type: string; text?: string } & Record<string, unknown>;
+        if (msg.type === "delta" && msg.text) {
+          answer += msg.text;
+          opts.onDelta?.(msg.text);
+        } else {
+          final = msg;
+        }
+      }
+    }
+
+    if (!final || final.type === "error") {
+      const status = Number(final?.status ?? 502);
+      if (status === 429) {
+        adoptQuota(final?.quota as RemoteQuota | undefined);
+        return final?.error === "provider-throttled" ? "throttled" : "quota-exhausted";
+      }
+      void refreshQuota();
+      return status === 503 ? "unavailable" : "failed";
+    }
+
+    const usage = (final.usage ?? {}) as { costUsd?: number; inputTokens?: number; outputTokens?: number };
+    const costUsd = Number(usage.costUsd ?? 0);
+    const provider = String(final.provider ?? "unknown");
     await db.aiUsage.add({
       date: ptDateStr(),
-      provider: data.provider ?? "unknown",
-      inputTokens: Number(data?.usage?.inputTokens ?? 0),
-      outputTokens: Number(data?.usage?.outputTokens ?? 0),
+      provider,
+      inputTokens: Number(usage.inputTokens ?? 0),
+      outputTokens: Number(usage.outputTokens ?? 0),
       costUsd,
       createdAt: Date.now(),
     });
     // Every answer carries the server's fresh figures; the 10-call and hourly
-    // triggers below only have to cover calls that failed to return one.
-    adoptQuota(data?.quota);
+    // triggers only have to cover calls that failed to return one.
+    adoptQuota(final.quota as RemoteQuota | undefined);
     void refreshQuota();
     notify();
-    return { answer: data.answer, provider: data.provider, costUsd };
+    return { answer: String(final.answer ?? answer), provider, costUsd };
   } catch {
     cache.callsSinceSync += 1;
     notify();

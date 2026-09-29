@@ -1,10 +1,13 @@
-// AI fallback endpoint: used only when the offline rule engine can't answer
-// confidently, or when the user explicitly presses "Ask AI".
+// AI reading endpoint. Every reading is written from the chart the client
+// computed offline; the model interprets, it never calculates.
 // Provider order: Anthropic Claude → Google Gemini (free tier) → 503.
+// Streams NDJSON when asked ({"type":"delta"} … {"type":"done"}) so a long
+// reading appears as it is written instead of after a 30-second spinner.
 // Auth-gated, zod-validated, rate-limited. API keys never reach the client.
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { BodySchema, ChartSchema } from "@/lib/aiSchema";
 import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@/auth";
 import {
@@ -16,51 +19,7 @@ import {
 } from "@/lib/quotaState";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
-
-const BodySchema = z.object({
-  question: z.string().min(3).max(4000),
-  lang: z.enum(["en", "hi"]),
-  /**
-   * "rashi"  = personal life-area reading for THIS chart only
-   * "verify" = check someone else's prediction claim-by-claim against THIS chart
-   */
-  mode: z.enum(["standard", "rashi", "verify", "schedule"]).optional(),
-  /** Full kundli context produced client-side — no account data */
-  kundli: z
-    .object({
-      lagna: z.string().max(100),
-      planets: z
-        .array(
-          z.object({
-            name: z.string().max(20),
-            sign: z.string().max(20),
-            house: z.number().int().min(1).max(12),
-            degree: z.string().max(16),
-            dignity: z.string().max(20),
-            retrograde: z.boolean().optional(),
-            combust: z.boolean().optional(),
-            nakshatra: z.string().max(30).optional(),
-          })
-        )
-        .max(10),
-      houseLords: z.array(z.string().max(160)).max(12).optional(),
-      navamsa: z.string().max(500).optional(),
-      dasamsa: z.string().max(500).optional(),
-      sav: z.string().max(300).optional(),
-      currentDasha: z.string().max(300),
-      dashaActivates: z.string().max(300).optional(),
-      upcomingDashas: z.array(z.string().max(120)).max(10).optional(),
-      transits: z.array(z.string().max(300)).max(10).optional(),
-      sadeSati: z.string().max(20).optional(),
-      yogas: z.array(z.string().max(120)).max(40),
-      moonNakshatra: z.string().max(40).optional(),
-      birthDate: z.string().max(20).optional(),
-      gender: z.string().max(10).optional(),
-      ageYears: z.number().int().min(0).max(130).optional(),
-    })
-    .strict(),
-});
+export const maxDuration = 120;
 
 // Simple in-memory per-user rate limit (single-user app; resets per instance)
 const hits = new Map<string, number[]>();
@@ -76,8 +35,9 @@ function rateLimited(key: string): boolean {
   return false;
 }
 
-function buildPrompt(body: z.infer<typeof BodySchema>): string {
-  const k = body.kundli;
+type Chart = z.infer<typeof ChartSchema>;
+
+function chartBlock(k: Chart, title = "NATIVE"): string {
   const planetLines = k.planets
     .map(
       (p) =>
@@ -87,7 +47,7 @@ function buildPrompt(body: z.infer<typeof BodySchema>): string {
     )
     .join("\n");
   return [
-    `=== NATIVE ===`,
+    `=== ${title} ===`,
     `${k.gender ?? "person"}, age ${k.ageYears ?? "unknown"}, born ${k.birthDate ?? "unknown"}`,
     ``,
     `=== RASI CHART D1 (Vedic, Lahiri ayanamsa, whole-sign houses) ===`,
@@ -117,11 +77,34 @@ function buildPrompt(body: z.infer<typeof BodySchema>): string {
     ``,
     k.yogas.length ? `=== YOGAS / DOSHAS ===\n${k.yogas.join("\n")}` : "",
     ``,
-    `=== QUESTION ===`,
-    body.question,
+    k.yogini || k.charaKarakas || k.shani
+      ? `=== CROSS-CHECK SYSTEMS ===\n${[
+          k.yogini && `Yogini dasha now: ${k.yogini}`,
+          k.charaKarakas && `Jaimini chara karakas: ${k.charaKarakas}`,
+          k.shani && `Saturn cycles (Sade Sati / Dhaiya): ${k.shani}`,
+        ]
+          .filter(Boolean)
+          .join("\n")}`
+      : "",
+    k.numerology ? `=== NUMEROLOGY ===\n${k.numerology}` : "",
+    k.currentPlace ? `Lives now in: ${k.currentPlace}` : "",
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+function buildPrompt(body: z.infer<typeof BodySchema>): string {
+  const parts = [chartBlock(body.kundli, body.mode === "match" ? "PERSON A (the user)" : "NATIVE")];
+  if (body.partner) parts.push("", chartBlock(body.partner, "PERSON B (the partner)"));
+  if (body.history?.length) {
+    parts.push(
+      "",
+      "=== EARLIER IN THIS CONSULTATION (for context; do not repeat it) ===",
+      ...body.history.map((h, i) => `Q${i + 1}: ${h.q}\nA${i + 1}: ${h.a}`)
+    );
+  }
+  parts.push("", body.history?.length ? "=== FOLLOW-UP QUESTION ===" : "=== QUESTION ===", body.question);
+  return parts.join("\n");
 }
 
 /**
@@ -237,7 +220,26 @@ const SCHEDULE_SYSTEM_PROMPT = (lang: "en" | "hi") =>
       : "Answer in English.",
   ].join("\n");
 
+/** Match mode: two charts, Ashtakoota already computed client-side */
+const MATCH_SYSTEM_PROMPT = (lang: "en" | "hi") =>
+  [
+    "You are a master Vedic astrologer (Jyotish) doing a marriage-compatibility consultation for TWO people. You are given both complete charts and the Ashtakoota (36-guna) table already computed, with any classical dosha cancellations.",
+    "",
+    "Guna Milan alone is a Moon-sign screen. A real match reading goes further: judge each person's 7th house, 7th lord, Venus (and Jupiter for a woman's chart), the D9 navamsa lagna and its lord, Manglik status after cancellations, the running dashas of BOTH people over the next few years, and whether their charts support each other (e.g. one's lagna lord friendly to the other's; one's Moon in the other's 7th).",
+    "",
+    "WRITE THESE SECTIONS:",
+    "**1. Verdict** — 2-3 sentences: is this a supportive match, a workable one with effort, or a difficult one? Decisive.",
+    "**2. Guna Milan in plain words** — what the score and any active doshas mean, and which doshas are cancelled and why.",
+    "**3. Beyond the gunas** — 3-5 bullets from the two charts themselves (7th houses, Venus, D9, Manglik, mutual placements).",
+    "**4. Timing** — the dasha periods of both people that favour marriage or bring strain, with dates from the data.",
+    "**5. Guidance** — practical advice for the couple and at most two classical, non-commercial remedies.",
+    "",
+    "RULES: 350-500 words, bullets. Cite only placements present in the data. Never frighten: an active dosha is a factor to work with, not a verdict of doom — but never hide a real difficulty either.",
+    lang === "hi" ? "पूरा उत्तर हिंदी में लिखें।" : "Answer in English.",
+  ].join("\n");
+
 function systemFor(body: z.infer<typeof BodySchema>): string {
+  if (body.mode === "match") return MATCH_SYSTEM_PROMPT(body.lang);
   if (body.mode === "rashi") return RASHI_SYSTEM_PROMPT(body.lang);
   if (body.mode === "verify") return VERIFY_SYSTEM_PROMPT(body.lang);
   if (body.mode === "schedule") return SCHEDULE_SYSTEM_PROMPT(body.lang);
@@ -250,47 +252,64 @@ export interface AiUsage {
   costUsd: number;
 }
 
-/** claude-opus-4-8: $5/M input, $25/M output */
+const CLAUDE_MODEL = "claude-opus-5-5";
+
+/** claude-opus-5-5: $4/M input, $20/M output */
 function claudeCost(inTok: number, outTok: number): number {
-  return (inTok * 5 + outTok * 25) / 1_000_000;
+  return (inTok * 4 + outTok * 20) / 1_000_000;
 }
 
+type Emit = (text: string) => void;
+
+/**
+ * Claude reading, streamed through `emit`. Returns null when Claude is not
+ * configured or failed BEFORE writing anything (so Gemini can take over);
+ * throws if it failed mid-answer (the partial text is already on screen).
+ */
 async function askClaude(
-  body: z.infer<typeof BodySchema>
+  body: z.infer<typeof BodySchema>,
+  emit: Emit
 ): Promise<{ text: string; usage: AiUsage } | null> {
   if (!process.env.ANTHROPIC_API_KEY) return null;
+  let text = "";
   try {
     const client = new Anthropic();
-    // withResponse() keeps the raw Response so the anthropic-ratelimit-*
-    // headers — the provider's own remaining-requests/tokens counts — can be
-    // recorded for the quota meter.
-    const { data: response, response: raw } = await client.messages
-      .create({
-        model: "claude-opus-4-8",
-        max_tokens: 8000,
-        thinking: { type: "adaptive" },
-        system: systemFor(body),
-        messages: [{ role: "user", content: buildPrompt(body) }],
-      })
-      .withResponse();
-    recordClaudeHeaders(raw.headers);
-    if (response.stop_reason === "refusal") return null;
-    const text = response.content
-      .filter((b) => b.type === "text")
-      .map((b) => b.text)
-      .join("");
+    const stream = client.beta.messages.stream({
+      model: CLAUDE_MODEL,
+      max_tokens: 16000,
+      thinking: { type: "adaptive" },
+      // a considered reading, not a chat reply — Opus 5.5 defaults to medium
+      output_config: { effort: "high" },
+      // on a safety decline the API re-runs the request on the fallback model
+      betas: ["server-side-fallback-2026-06-01"],
+      fallbacks: [{ model: "claude-opus-4-8" }],
+      system: systemFor(body),
+      messages: [{ role: "user", content: buildPrompt(body) }],
+    });
+    // the anthropic-ratelimit-* headers feed the quota meter
+    stream
+      .withResponse()
+      .then(({ response }) => recordClaudeHeaders(response.headers))
+      .catch(() => {});
+    for await (const event of stream) {
+      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+        text += event.delta.text;
+        emit(event.delta.text);
+      }
+    }
+    const final = await stream.finalMessage();
+    if (final.stop_reason === "refusal" && !text) return null;
     if (!text) return null;
-    const inTok = response.usage.input_tokens;
-    const outTok = response.usage.output_tokens;
-    return {
-      text,
-      usage: {
-        inputTokens: inTok,
-        outputTokens: outTok,
-        costUsd: claudeCost(inTok, outTok),
-      },
-    };
-  } catch {
+    const inTok = final.usage.input_tokens;
+    const outTok = final.usage.output_tokens;
+    return { text, usage: { inputTokens: inTok, outputTokens: outTok, costUsd: claudeCost(inTok, outTok) } };
+  } catch (err) {
+    if (text) throw err;
+    if (err instanceof Anthropic.APIError) {
+      console.error(`Claude ${err.status}: ${err.message}`);
+    } else {
+      console.error("Claude call failed", err);
+    }
     return null;
   }
 }
@@ -304,7 +323,8 @@ type GeminiQuotaHit = {
 
 async function askGemini(
   body: z.infer<typeof BodySchema>,
-  clientKey: string | null
+  clientKey: string | null,
+  emit: Emit
 ): Promise<{ text: string; usage: AiUsage } | GeminiQuotaHit | null> {
   // Server key first; otherwise the user's own free-tier key sent from the
   // browser (stored only client-side).
@@ -312,9 +332,10 @@ async function askGemini(
   const key = serverKey || clientKey;
   if (!key) return null;
   const keyId = geminiKeyId(key, Boolean(serverKey));
+  let text = "";
   try {
     const res = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse",
       {
         method: "POST",
         headers: {
@@ -332,7 +353,7 @@ async function askGemini(
             thinkingConfig: { thinkingBudget: 3072 },
           },
         }),
-        signal: AbortSignal.timeout(55_000),
+        signal: AbortSignal.timeout(110_000),
       }
     );
     // The request reached Google, so it counts against the free tier whatever
@@ -344,22 +365,52 @@ async function askGemini(
       const { scope, retryAfterMs } = recordGeminiQuotaError(keyId, errBody);
       return { kind: "quota", scope, retryAfterMs };
     }
-    if (!res.ok) return null;
-    const data = await res.json();
-    const text: string | undefined =
-      data?.candidates?.[0]?.content?.parts
-        ?.map((p: { text?: string }) => p.text ?? "")
-        .join("");
+    if (!res.ok || !res.body) {
+      console.error(`Gemini ${res.status}`);
+      return null;
+    }
+
+    // Server-sent events: one JSON chunk per "data:" line
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    let usageMeta: { promptTokenCount?: number; candidatesTokenCount?: number } | undefined;
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let nl: number;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (!line.startsWith("data:")) continue;
+        try {
+          const chunk = JSON.parse(line.slice(5));
+          const parts: { text?: string; thought?: boolean }[] =
+            chunk?.candidates?.[0]?.content?.parts ?? [];
+          for (const p of parts) {
+            if (p.thought || !p.text) continue; // never surface the model's reasoning
+            text += p.text;
+            emit(p.text);
+          }
+          if (chunk?.usageMetadata) usageMeta = chunk.usageMetadata;
+        } catch {
+          // a malformed chunk — skip it, the next one carries on
+        }
+      }
+    }
     if (!text) return null;
     return {
       text,
       usage: {
-        inputTokens: data?.usageMetadata?.promptTokenCount ?? 0,
-        outputTokens: data?.usageMetadata?.candidatesTokenCount ?? 0,
+        inputTokens: usageMeta?.promptTokenCount ?? 0,
+        outputTokens: usageMeta?.candidatesTokenCount ?? 0,
         costUsd: 0, // Gemini flash free tier
       },
     };
-  } catch {
+  } catch (err) {
+    if (text) throw err;
+    console.error("Gemini call failed", err);
     return null;
   }
 }
@@ -387,40 +438,63 @@ export async function POST(req: Request) {
     ? rawClientKey
     : null;
 
-  const claude = await askClaude(body);
-  if (claude) {
-    return NextResponse.json({
-      answer: claude.text,
-      provider: "claude",
-      usage: claude.usage,
-      quota: quotaSnapshot(),
-    });
+  // One pipeline for both response styles: `emit` streams deltas when the
+  // client asked for a stream and is a no-op otherwise.
+  const run = async (emit: Emit): Promise<{ status: number; payload: Record<string, unknown> }> => {
+    const claude = await askClaude(body, emit);
+    if (claude) {
+      return { status: 200, payload: { answer: claude.text, provider: "claude", usage: claude.usage, quota: quotaSnapshot() } };
+    }
+    const gemini = await askGemini(body, clientKey, emit);
+    if (gemini && "kind" in gemini) {
+      // Google's own quota signal — a per-minute burst clears by itself, a
+      // per-day exhaustion lasts until midnight US-Pacific.
+      return {
+        status: 429,
+        payload: {
+          error: gemini.scope === "minute" ? "provider-throttled" : "provider-quota",
+          retryAfterMs: gemini.retryAfterMs,
+          quota: quotaSnapshot(),
+        },
+      };
+    }
+    if (gemini) {
+      return { status: 200, payload: { answer: gemini.text, provider: "gemini", usage: gemini.usage, quota: quotaSnapshot() } };
+    }
+    return { status: 503, payload: { error: "no-ai-available" } };
+  };
+
+  if (!body.stream) {
+    try {
+      const r = await run(() => {});
+      return NextResponse.json(r.payload, { status: r.status });
+    } catch {
+      return NextResponse.json({ error: "failed" }, { status: 502 });
+    }
   }
 
-  const gemini = await askGemini(body, clientKey);
-  if (gemini && "kind" in gemini) {
-    // Google's own quota signal — a per-minute burst clears by itself, a
-    // per-day exhaustion lasts until midnight US-Pacific.
-    return NextResponse.json(
-      {
-        error:
-          gemini.scope === "minute" ? "provider-throttled" : "provider-quota",
-        retryAfterMs: gemini.retryAfterMs,
-        quota: quotaSnapshot(),
-      },
-      { status: 429 }
-    );
-  }
-  if (gemini) {
-    return NextResponse.json({
-      answer: gemini.text,
-      provider: "gemini",
-      usage: gemini.usage,
-      quota: quotaSnapshot(),
-    });
-  }
-
-  return NextResponse.json({ error: "no-ai-available" }, { status: 503 });
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (obj: Record<string, unknown>) =>
+        controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
+      try {
+        const r = await run((text) => send({ type: "delta", text }));
+        send(r.status === 200 ? { type: "done", ...r.payload } : { type: "error", status: r.status, ...r.payload });
+      } catch {
+        send({ type: "error", status: 502, error: "interrupted" });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+  return new Response(stream, {
+    headers: {
+      "content-type": "application/x-ndjson; charset=utf-8",
+      "cache-control": "no-store",
+      "x-accel-buffering": "no",
+    },
+  });
 }
 
 /**
