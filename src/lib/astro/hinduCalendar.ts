@@ -2,7 +2,8 @@
 // the Moon's elongation (for drawing its true appearance), lunar (Amanta)
 // month name, Vikram Samvat year, and special-day markers.
 
-import { siderealLongitude, sunriseSunset } from "./ephemeris";
+import { SearchMoonPhase } from "astronomy-engine";
+import { siderealLongitude, sunriseSunsetOnDate } from "./ephemeris";
 import { nakshatraOf } from "./nakshatra";
 import { norm360 } from "./constants";
 
@@ -33,6 +34,8 @@ export interface CalendarDayInfo {
   sunsetMs?: number;
   /** Amanta lunar month 0–11 (index into LUNAR_MONTHS) */
   lunarMonth: number;
+  /** true inside an Adhika (intercalary) month — no festivals are kept */
+  adhika: boolean;
   /** tithis occurring between this sunrise and the next (kshaya-aware) */
   coveredTithis: number[];
   /** festivals falling on this day */
@@ -48,6 +51,11 @@ export interface LunarMonthInfo {
   /** 0–11 index into LUNAR_MONTHS */
   index: number;
   vikramSamvat: number;
+  /** intercalary month: no Sankranti falls between its two new moons */
+  adhika: boolean;
+  /** UTC ms of the new moons that open and close this month */
+  startMs: number;
+  endMs: number;
 }
 
 export const LUNAR_MONTHS: { en: string; hi: string }[] = [
@@ -69,33 +77,60 @@ function elongationAt(ms: number): number {
   return norm360(siderealLongitude("Moon", ms) - siderealLongitude("Sun", ms));
 }
 
+/** Exact new moon at or before `ms` (UTC ms) */
+function newMoonBefore(ms: number): number {
+  const t = SearchMoonPhase(0, new Date(ms - 31 * DAY_MS), 31);
+  let last = t ? t.date.getTime() : ms - 29.53 * DAY_MS;
+  // walk forward while the next new moon is still not after `ms`
+  for (let i = 0; i < 3; i++) {
+    const n = SearchMoonPhase(0, new Date(last + DAY_MS), 31);
+    if (!n || n.date.getTime() > ms) break;
+    last = n.date.getTime();
+  }
+  return last;
+}
+
+/** Exact new moon strictly after `ms` */
+function newMoonAfter(ms: number): number {
+  const n = SearchMoonPhase(0, new Date(ms + 60_000), 31);
+  return n ? n.date.getTime() : ms + 29.53 * DAY_MS;
+}
+
+const sunSignAt = (ms: number) => Math.floor(siderealLongitude("Sun", ms) / 30) % 12;
+
 /**
- * Amanta lunar month for an instant: the month begins at the last new moon,
- * and is named after the sign the Sun enters during it (sign at the new
- * moon + 1). Vikram Samvat ≈ CE + 57 (yearly rollover at Chaitra).
+ * Amanta lunar month for an instant: the month runs from one exact new moon
+ * to the next and is named after the sign the Sun enters during it (Sun's
+ * sign at the opening new moon + 1). If the Sun enters NO new sign between
+ * the two new moons, the month is Adhika (intercalary) and shares the name
+ * of the month that follows — e.g. Adhika Jyeshtha, 17 May–15 Jun 2026.
+ * Vikram Samvat rolls over at Chaitra Shukla Pratipada.
  */
 export function lunarMonthInfo(ms: number): LunarMonthInfo {
-  // Walk back to the most recent new moon (elongation wraps 360 → 0)
-  let t = ms;
-  let prev = elongationAt(t);
-  for (let i = 0; i < 130; i++) {
-    const t2 = t - 6 * 3600 * 1000;
-    const e2 = elongationAt(t2);
-    if (e2 > prev) {
-      // crossed the new moon between t2 and t
-      break;
-    }
-    t = t2;
-    prev = e2;
-  }
-  const sunSignAtNewMoon = Math.floor(siderealLongitude("Sun", t) / 30) % 12;
-  const index = (sunSignAtNewMoon + 1) % 12;
+  const startMs = newMoonBefore(ms);
+  const endMs = newMoonAfter(startMs);
+  const startSign = sunSignAt(startMs);
+  const adhika = sunSignAt(endMs) === startSign;
+  const index = (startSign + 1) % 12;
 
-  const gYear = new Date(ms).getUTCFullYear();
-  // Vikram Samvat increments at Chaitra (≈ March/April)
-  const month = new Date(ms).getUTCMonth(); // 0-11
-  const samvat = gYear + (month >= 3 || (month >= 2 && index === 0) ? 57 : 56);
-  return { index, vikramSamvat: samvat };
+  const d = new Date(ms);
+  const gYear = d.getUTCFullYear();
+  // Jan–Apr dates still in Margashirsha…Phalguna belong to the previous
+  // Samvat year; everything from Chaitra onwards is CE + 57.
+  const samvat = gYear + (d.getUTCMonth() <= 3 && index >= 8 ? 56 : 57);
+  return { index, vikramSamvat: samvat, adhika, startMs, endMs };
+}
+
+/** Month info for many instants, reusing each lunation once computed */
+function lunarMonthResolver(): (ms: number) => LunarMonthInfo {
+  const seen: LunarMonthInfo[] = [];
+  return (ms: number) => {
+    const hit = seen.find((m) => ms >= m.startMs && ms < m.endMs);
+    if (hit) return hit;
+    const info = lunarMonthInfo(ms);
+    seen.push(info);
+    return info;
+  };
 }
 
 // ── Festivals (Amanta lunar month + tithi rules; solar for sankrantis) ──
@@ -319,7 +354,7 @@ export function buildMonthCalendar(
     const dayStartMs = Date.UTC(year, month, d) + tzOffsetMinutes * 60 * 1000;
     const noonMs = dayStartMs + 12 * 3600 * 1000;
 
-    const rs = sunriseSunset(noonMs, latitude, longitude);
+    const rs = sunriseSunsetOnDate(year, month + 1, d, latitude, longitude);
     const refMs =
       rs.sunrise !== undefined &&
       rs.sunrise >= dayStartMs &&
@@ -356,6 +391,7 @@ export function buildMonthCalendar(
           ? rs.sunset
           : undefined,
       lunarMonth: 0, // filled in the post-pass below
+      adhika: false,
       coveredTithis: [],
       festivals: [],
       isPurnima: tithi === 14,
@@ -393,30 +429,38 @@ export function buildMonthCalendar(
     cur.isEkadashi = covered.includes(10) || covered.includes(25);
   }
 
-  // Amanta lunar month per day: starts from the first day's month, and
-  // advances the day after each Amavasya completes.
-  let lm = lunarMonthInfo(out[0].refMs).index;
-  for (let i = 0; i < out.length; i++) {
-    if (i > 0 && out[i - 1].coveredTithis.includes(29)) {
-      lm = (lm + 1) % 12;
-    }
-    out[i].lunarMonth = lm;
+  // Amanta lunar month per day, from the month running at the day's
+  // sunrise — exact new-moon boundaries, Adhika months detected.
+  const monthOf = lunarMonthResolver();
+  for (const d of out) {
+    const info = monthOf(d.refMs);
+    d.lunarMonth = info.index;
+    d.adhika = info.adhika;
   }
 
   // Festivals. Day festivals match the tithis covered from this sunrise;
   // night festivals (nishita/pradosh rule) match the tithi running at the
-  // local midnight that ends this day. A covered tithi belongs to this
-  // day's lunar month unless it wrapped past Amavasya.
-  for (const d of out) {
-    const nightTithi =
-      Math.floor(elongationAt(d.dayStartMs + DAY_MS) / 12) % 30;
-    const monthFor = (t: number) =>
-      t >= d.tithi ? d.lunarMonth : (d.lunarMonth + 1) % 12;
+  // local midnight that ends this day. Each tithi is looked up in the lunar
+  // month it actually belongs to, and nothing is celebrated in an Adhika
+  // month (festivals move to the Nija month that follows).
+  for (let i = 0; i < out.length; i++) {
+    const d = out[i];
+    const nightMs = d.dayStartMs + DAY_MS;
+    const nightTithi = Math.floor(elongationAt(nightMs) / 12) % 30;
+    const nightMonth = monthOf(nightMs);
+    const nextRef = i + 1 < out.length ? out[i + 1].refMs : d.refMs + DAY_MS;
+    const monthFor = (t: number) => (t >= d.tithi ? monthOf(d.refMs) : monthOf(nextRef));
 
     for (const f of FESTIVALS) {
-      const matched = f.night
-        ? nightTithi === f.tithi && f.month === monthFor(nightTithi)
-        : d.coveredTithis.includes(f.tithi) && f.month === monthFor(f.tithi);
+      let matched = false;
+      if (f.night) {
+        matched = !nightMonth.adhika && nightTithi === f.tithi && f.month === nightMonth.index;
+      } else if (d.coveredTithis.includes(f.tithi)) {
+        const m = monthFor(f.tithi);
+        matched = !m.adhika && f.month === m.index;
+      }
+      // a festival tithi spanning two sunrises is kept on the first day only
+      if (matched && i > 0 && out[i - 1].festivals.some((x) => x.en === f.en)) matched = false;
       if (matched) d.festivals.push({ en: f.en, hi: f.hi });
     }
     if (d.sankrantiSign !== undefined && SANKRANTI_FESTIVALS[d.sankrantiSign]) {

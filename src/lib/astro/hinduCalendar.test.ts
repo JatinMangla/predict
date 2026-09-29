@@ -128,3 +128,46 @@ describe("lunar month (Amanta) and Vikram Samvat", () => {
     expect(m.vikramSamvat).toBe(2081);
   });
 });
+
+describe("Adhika masa (2026 has Adhika Jyeshtha, 17 May – 15 Jun)", () => {
+  const cal = (m: number) => buildMonthCalendar(2026, m, DELHI.lat, DELHI.lon, DELHI.tz);
+  const may = cal(4);
+  const jun = cal(5);
+  const jul = cal(6);
+  const all = [...may, ...jun, ...jul];
+  const daysOf = (name: string) =>
+    all.filter((d) => d.festivals.some((f) => f.en.startsWith(name)));
+
+  it("flags the intercalary month and names it Jyeshtha", () => {
+    const d = may.find((x) => x.day === 25)!;
+    expect(d.adhika).toBe(true);
+    expect(LUNAR_MONTHS[d.lunarMonth].en).toBe("Jyeshtha");
+    const nija = jun.find((x) => x.day === 20)!;
+    expect(nija.adhika).toBe(false);
+    expect(LUNAR_MONTHS[nija.lunarMonth].en).toBe("Jyeshtha");
+    expect(LUNAR_MONTHS[jul.find((x) => x.day === 20)!.lunarMonth].en).toBe("Ashadha");
+  });
+
+  it("keeps no festivals inside the Adhika month", () => {
+    expect(all.filter((d) => d.adhika && d.festivals.length > 0)).toEqual([]);
+  });
+
+  it("puts Vat Purnima on 29 Jun and Guru Purnima once, on 29 Jul", () => {
+    expect(daysOf("Vat Purnima").map((d) => d.day)).toEqual([29]);
+    const guru = daysOf("Guru Purnima");
+    expect(guru.length).toBe(1);
+    expect(guru[0].day).toBe(29);
+    expect(jul.includes(guru[0])).toBe(true);
+  });
+
+  it("puts Devshayani Ekadashi in July only", () => {
+    const d = daysOf("Devshayani");
+    expect(d.length).toBe(1);
+    expect(jul.includes(d[0])).toBe(true);
+  });
+
+  it("lunarMonthInfo reports the Adhika flag", () => {
+    expect(lunarMonthInfo(Date.UTC(2026, 4, 25)).adhika).toBe(true);
+    expect(lunarMonthInfo(Date.UTC(2026, 5, 25)).adhika).toBe(false);
+  });
+});

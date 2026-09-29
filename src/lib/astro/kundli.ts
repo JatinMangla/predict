@@ -10,7 +10,7 @@ import type {
   VargaChart,
 } from "./types";
 import { PLANETS, COMBUSTION_ORB, norm360, angleDiff } from "./constants";
-import { lahiriAyanamsa } from "./ayanamsa";
+import { trueAyanamsa } from "./ayanamsa";
 import {
   siderealLongitude,
   tropicalLongitude,
@@ -42,7 +42,7 @@ export function houseOfSign(lagnaSign: number, sign: number): number {
 
 export function computeKundli(birth: BirthDetails): Kundli {
   const utcMs = birthToUtcMs(birth.localDateTime, birth.timezone);
-  const ayanamsa = lahiriAyanamsa(utcMs);
+  const ayanamsa = trueAyanamsa(utcMs);
 
   // Lagna
   const lagnaLon = ascendantSidereal(utcMs, birth.latitude, birth.longitude);

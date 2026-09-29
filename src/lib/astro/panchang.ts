@@ -7,7 +7,7 @@ import {
   KARANA_FIXED,
   norm360,
 } from "./constants";
-import { siderealLongitude, sunriseSunset } from "./ephemeris";
+import { siderealLongitude, sunriseSunsetOnDate } from "./ephemeris";
 import { nakshatraOf } from "./nakshatra";
 
 /** Karana name for a 0–59 index within the lunar month */
@@ -47,10 +47,12 @@ export function computePanchang(
   const nakshatra = nakshatraOf(moon);
 
   // Vara: weekday of the local calendar date, shifted back one day if the
-  // moment is before sunrise (the Vedic day runs sunrise to sunrise).
+  // moment is before THAT date's sunrise (the Vedic day runs sunrise to
+  // sunrise). Sunrise is searched for the civil date itself, so a birth at
+  // 22:30 keeps its own weekday.
   const [y, m, d] = localDate.split("-").map(Number);
   let varaDayMs = Date.UTC(y, m - 1, d);
-  const rs = sunriseSunset(utcMs, latitude, longitude);
+  const rs = sunriseSunsetOnDate(y, m, d, latitude, longitude);
   if (rs.sunrise !== undefined && utcMs < rs.sunrise) {
     varaDayMs -= 86400 * 1000;
   }

@@ -28,6 +28,43 @@ export function lahiriAyanamsa(utcMs: number): number {
   return AYAN_REF + (precessionArcsec(T) - precessionArcsec(T_REF)) / 3600;
 }
 
+/**
+ * Nutation in longitude (Δψ) and obliquity (Δε), degrees — Meeus ch. 22
+ * low-precision series (accurate to ~0.5″). Tropical positions from the
+ * ephemeris are referred to the TRUE equinox of date, while the Lahiri
+ * ayanamsa is a MEAN quantity, so Δψ must be removed to get true
+ * Chitrapaksha positions (Spica stays fixed at 180°), as Swiss Ephemeris and
+ * Drik Panchang do.
+ */
+export function nutation(utcMs: number): { dPsi: number; dEps: number } {
+  const T = centuriesFromJ2000(utcMs);
+  const r = Math.PI / 180;
+  const omega = (125.04452 - 1934.136261 * T) * r;
+  const L = (280.4665 + 36000.7698 * T) * r;
+  const Lp = (218.3165 + 481267.8813 * T) * r;
+  const dPsi =
+    -17.2 * Math.sin(omega) -
+    1.32 * Math.sin(2 * L) -
+    0.23 * Math.sin(2 * Lp) +
+    0.21 * Math.sin(2 * omega);
+  const dEps =
+    9.2 * Math.cos(omega) +
+    0.57 * Math.cos(2 * L) +
+    0.1 * Math.cos(2 * Lp) -
+    0.09 * Math.cos(2 * omega);
+  return { dPsi: dPsi / 3600, dEps: dEps / 3600 };
+}
+
+/** Ayanamsa to subtract from a true-equinox-of-date tropical longitude */
+export function trueAyanamsa(utcMs: number): number {
+  return lahiriAyanamsa(utcMs) + nutation(utcMs).dPsi;
+}
+
+/** True obliquity of the ecliptic (mean + nutation), degrees */
+export function trueObliquity(utcMs: number): number {
+  return meanObliquity(utcMs) + nutation(utcMs).dEps;
+}
+
 /** Mean obliquity of the ecliptic in degrees (Meeus) */
 export function meanObliquity(utcMs: number): number {
   const T = centuriesFromJ2000(utcMs);
