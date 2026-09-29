@@ -7,6 +7,7 @@ import {
   OWN_SIGNS,
   EXALTATION,
   NATURAL_BENEFICS,
+  ASPECTS,
   norm360,
 } from "./constants";
 
@@ -31,6 +32,23 @@ function makeCtx(planets: PlanetPosition[], lagna: LagnaInfo): Ctx {
 const KENDRA = [1, 4, 7, 10];
 const TRIKONA = [1, 5, 9];
 const DUSTHANA = [6, 8, 12];
+
+/** Does `from` cast a full graha drishti on the sign `toSign`? */
+function aspectsSign(from: PlanetPosition, toSign: number): boolean {
+  const rel = ((toSign - from.sign + 12) % 12) + 1;
+  return ASPECTS[from.id].includes(rel);
+}
+
+/** Two planets related by conjunction, sign exchange or mutual aspect */
+function related(
+  a: PlanetPosition,
+  b: PlanetPosition
+): "conjunction" | "aspect" | "exchange" | null {
+  if (a.sign === b.sign) return "conjunction";
+  if (OWN_SIGNS[a.id].includes(b.sign) && OWN_SIGNS[b.id].includes(a.sign)) return "exchange";
+  if (aspectsSign(a, b.sign) && aspectsSign(b, a.sign)) return "aspect";
+  return null;
+}
 
 /** Lord of the nth house (whole sign) from lagna */
 function houseLord(lagnaSign: number, house: number): PlanetId {
@@ -67,6 +85,11 @@ export function detectYogas(
   out.push(...grahanDosha(ctx));
   push(shakata(ctx));
   push(lagnaLordStrong(ctx));
+  push(dharmaKarmadhipati(ctx));
+  push(mahabhagya(ctx));
+  push(vasumati(ctx));
+  push(daridra(ctx));
+  push(pitraDosha(ctx));
   return out;
 }
 
@@ -75,6 +98,9 @@ function gajakesari(c: Ctx): YogaResult | null {
   const jup = c.get("Jupiter");
   const rel = c.houseFrom(moon.sign, jup.sign);
   if (!KENDRA.includes(rel)) return null;
+  // Phaladeepika: the yoga needs an unafflicted Jupiter and Moon — not
+  // debilitated and not combust — otherwise it gives little.
+  if (jup.dignity === "debilitated" || jup.combust || moon.dignity === "debilitated") return null;
   const strong = ["exalted", "own", "moolatrikona"].includes(jup.dignity);
   return {
     key: "gajakesari",
@@ -88,11 +114,14 @@ function budhaditya(c: Ctx): YogaResult | null {
   const sun = c.get("Sun");
   const mer = c.get("Mercury");
   if (sun.sign !== mer.sign) return null;
+  // Mercury is never more than ~28° from the Sun, so the bare conjunction is
+  // extremely common; it only works as a yoga when Mercury is not burnt up.
+  if (mer.combust) return null;
   return {
     key: "budhaditya",
     kind: "yoga",
-    detail: `Sun + Mercury in house ${sun.house}`,
-    strength: mer.combust ? 1 : 2,
+    detail: `Sun + Mercury (not combust) in house ${sun.house}`,
+    strength: ["exalted", "own", "moolatrikona"].includes(mer.dignity) ? 3 : 2,
   };
 }
 
@@ -146,17 +175,23 @@ function rajaYogas(c: Ctx): YogaResult[] {
       if (kl === tl) continue;
       const pk = c.get(kl);
       const pt = c.get(tl);
-      if (pk.sign === pt.sign) {
-        const pair = [kl, tl].sort().join("+");
-        if (seen.has(pair)) continue;
-        seen.add(pair);
-        out.push({
-          key: "raja-yoga",
-          kind: "yoga",
-          detail: `${kl} (kendra lord) with ${tl} (trikona lord) in house ${pk.house}`,
-          strength: DUSTHANA.includes(pk.house) ? 1 : 3,
-        });
-      }
+      const rel = related(pk, pt);
+      if (!rel) continue;
+      const pair = [kl, tl].sort().join("+");
+      if (seen.has(pair)) continue;
+      seen.add(pair);
+      const inDusthana = DUSTHANA.includes(pk.house) || DUSTHANA.includes(pt.house);
+      out.push({
+        key: "raja-yoga",
+        kind: "yoga",
+        detail:
+          rel === "conjunction"
+            ? `${kl} (kendra lord) with ${tl} (trikona lord) in house ${pk.house}`
+            : rel === "exchange"
+              ? `${kl} (kendra lord) and ${tl} (trikona lord) exchange signs`
+              : `${kl} (kendra lord) and ${tl} (trikona lord) in mutual aspect`,
+        strength: inDusthana ? 1 : rel === "aspect" ? 2 : 3,
+      });
     }
   }
   return out;
@@ -250,11 +285,23 @@ function kemadruma(c: Ctx): YogaResult | null {
     return rel === 1 || rel === 2 || rel === 12;
   });
   if (occupied) return null;
+  // Bhanga (cancellation): a planet in a kendra from the lagna or from the
+  // Moon, the Moon itself in a kendra, or Jupiter aspecting the Moon.
+  const cancelledBy: string[] = [];
+  const inKendraLagna = others.filter((p) => KENDRA.includes(p.house));
+  const inKendraMoon = others.filter((p) => KENDRA.includes(c.houseFrom(moon.sign, p.sign)));
+  if (inKendraLagna.length)
+    cancelledBy.push(`${inKendraLagna.map((p) => p.id).join(", ")} in a kendra from the lagna`);
+  if (inKendraMoon.length)
+    cancelledBy.push(`${inKendraMoon.map((p) => p.id).join(", ")} in a kendra from the Moon`);
+  if (KENDRA.includes(moon.house)) cancelledBy.push("Moon itself in a kendra from the lagna");
+  if (aspectsSign(c.get("Jupiter"), moon.sign)) cancelledBy.push("Jupiter aspects the Moon");
   return {
     key: "kemadruma",
     kind: "dosha",
-    detail: "No planets around the Moon",
-    strength: 2,
+    detail: "No planets in the 2nd or 12th from the Moon",
+    strength: cancelledBy.length ? 1 : 2,
+    ...(cancelledBy.length ? { cancelledBy } : {}),
   };
 }
 
@@ -386,20 +433,46 @@ function parivartana(c: Ctx): YogaResult[] {
   return out;
 }
 
+const SIGN_EN = [
+  "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+  "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
+];
+
 function manglik(c: Ctx): YogaResult | null {
   const mars = c.get("Mars");
   const moon = c.get("Moon");
+  const venus = c.get("Venus");
   const MANGLIK_HOUSES = [1, 2, 4, 7, 8, 12];
+  // Counted from the lagna, the Moon and Venus (the three classical anchors)
   const fromLagna = MANGLIK_HOUSES.includes(mars.house);
   const fromMoon = MANGLIK_HOUSES.includes(c.houseFrom(moon.sign, mars.sign));
-  if (!fromLagna && !fromMoon) return null;
+  const fromVenus = MANGLIK_HOUSES.includes(c.houseFrom(venus.sign, mars.sign));
+  const count = [fromLagna, fromMoon, fromVenus].filter(Boolean).length;
+  if (count === 0) return null;
+
+  // Widely applied exceptions (Muhurta Chintamani and regional practice)
+  const cancelledBy: string[] = [];
+  if (["own", "exalted", "moolatrikona"].includes(mars.dignity))
+    cancelledBy.push(`Mars ${mars.dignity} in ${SIGN_EN[mars.sign]}`);
+  if (mars.sign === 4 || mars.sign === 10) cancelledBy.push("Mars in Leo or Aquarius");
+  const jup = c.get("Jupiter");
+  if (jup.sign === mars.sign || aspectsSign(jup, mars.sign))
+    cancelledBy.push("Jupiter joins or aspects Mars");
+  if (moon.sign === mars.sign) cancelledBy.push("Mars conjunct the Moon");
+  if (mars.house === 2 && (mars.sign === 2 || mars.sign === 5))
+    cancelledBy.push("Mars in the 2nd in a Mercury sign");
+  if (mars.house === 12 && (mars.sign === 1 || mars.sign === 6))
+    cancelledBy.push("Mars in the 12th in a Venus sign");
+
+  const where = [fromLagna && "lagna", fromMoon && "Moon", fromVenus && "Venus"]
+    .filter(Boolean)
+    .join(", ");
   return {
     key: "manglik",
     kind: "dosha",
-    detail: fromLagna
-      ? `Mars in house ${mars.house} from lagna`
-      : "Mars in manglik position from Moon",
-    strength: fromLagna && fromMoon ? 3 : fromLagna ? 2 : 1,
+    detail: `Mars in house ${mars.house}; manglik counted from ${where}`,
+    strength: cancelledBy.length ? 1 : count >= 2 && fromLagna ? 3 : fromLagna ? 2 : 1,
+    ...(cancelledBy.length ? { cancelledBy } : {}),
   };
 }
 
@@ -476,5 +549,102 @@ function lagnaLordStrong(c: Ctx): YogaResult | null {
     kind: "yoga",
     detail: `Lagna lord ${lord} well placed in house ${p.house}`,
     strength: 2,
+  };
+}
+
+/** Dharma-Karmadhipati: the 9th and 10th lords associated — the chief raja yoga */
+function dharmaKarmadhipati(c: Ctx): YogaResult | null {
+  const l9 = houseLord(c.lagna.sign, 9);
+  const l10 = houseLord(c.lagna.sign, 10);
+  if (l9 === l10) return null;
+  const rel = related(c.get(l9), c.get(l10));
+  if (!rel) return null;
+  const p = c.get(l9);
+  return {
+    key: "dharma-karmadhipati",
+    kind: "yoga",
+    detail: `9th lord ${l9} and 10th lord ${l10}: ${rel}`,
+    strength: DUSTHANA.includes(p.house) ? 1 : 3,
+  };
+}
+
+/**
+ * Mahabhagya (BPHS): a man born by day with lagna, Sun and Moon in odd
+ * signs, or a woman born by night with all three in even signs. Day birth is
+ * read from the Sun above the horizon (houses 7–12).
+ */
+function mahabhagya(c: Ctx): YogaResult | null {
+  const sun = c.get("Sun");
+  const moon = c.get("Moon");
+  const day = sun.house >= 7;
+  const odd = (s: number) => s % 2 === 0; // Aries (0) is an odd sign
+  const allOdd = odd(c.lagna.sign) && odd(sun.sign) && odd(moon.sign);
+  const allEven = !odd(c.lagna.sign) && !odd(sun.sign) && !odd(moon.sign);
+  if (!((day && allOdd) || (!day && allEven))) return null;
+  return {
+    key: "mahabhagya",
+    kind: "yoga",
+    detail: `${day ? "Day" : "Night"} birth with lagna, Sun and Moon in ${allOdd ? "odd" : "even"} signs (classically for a ${allOdd ? "man" : "woman"})`,
+    strength: 2,
+  };
+}
+
+/** Vasumati: benefics in upachaya houses (3, 6, 10, 11) from the lagna or Moon */
+function vasumati(c: Ctx): YogaResult | null {
+  const moon = c.get("Moon");
+  const UPACHAYA = [3, 6, 10, 11];
+  const ben = (["Jupiter", "Venus", "Mercury"] as PlanetId[]).map((id) => c.get(id));
+  const fromLagna = ben.filter((p) => UPACHAYA.includes(p.house));
+  const fromMoon = ben.filter((p) => UPACHAYA.includes(c.houseFrom(moon.sign, p.sign)));
+  const best = fromLagna.length >= fromMoon.length ? fromLagna : fromMoon;
+  if (best.length < 2) return null;
+  return {
+    key: "vasumati",
+    kind: "yoga",
+    detail: `${best.map((p) => p.id).join(", ")} in upachaya houses from the ${best === fromLagna ? "lagna" : "Moon"}`,
+    strength: best.length === 3 ? 3 : 2,
+  };
+}
+
+/** Daridra (BPHS): the 11th lord in a dusthana — gains leak away */
+function daridra(c: Ctx): YogaResult | null {
+  const l11 = houseLord(c.lagna.sign, 11);
+  const p = c.get(l11);
+  if (!DUSTHANA.includes(p.house)) return null;
+  const cancelledBy: string[] = [];
+  if (["exalted", "own", "moolatrikona"].includes(p.dignity))
+    cancelledBy.push(`11th lord ${l11} is ${p.dignity}`);
+  const jup = c.get("Jupiter");
+  if (l11 !== "Jupiter" && (aspectsSign(jup, p.sign) || jup.sign === p.sign))
+    cancelledBy.push("Jupiter protects the 11th lord");
+  return {
+    key: "daridra",
+    kind: "dosha",
+    detail: `11th lord ${l11} in house ${p.house}`,
+    strength: cancelledBy.length ? 1 : 2,
+    ...(cancelledBy.length ? { cancelledBy } : {}),
+  };
+}
+
+/** Pitra dosha (popular reading): the Sun afflicted by Rahu or Saturn, or Rahu in the 9th */
+function pitraDosha(c: Ctx): YogaResult | null {
+  const sun = c.get("Sun");
+  const rahu = c.get("Rahu");
+  const sat = c.get("Saturn");
+  const reasons: string[] = [];
+  if (sun.sign === rahu.sign) reasons.push("Sun with Rahu");
+  if (sun.sign === sat.sign) reasons.push("Sun with Saturn");
+  if (rahu.house === 9) reasons.push("Rahu in the 9th house");
+  if (reasons.length === 0) return null;
+  const cancelledBy: string[] = [];
+  const jup = c.get("Jupiter");
+  if (aspectsSign(jup, sun.sign) || jup.sign === sun.sign)
+    cancelledBy.push("Jupiter aspects or joins the Sun");
+  return {
+    key: "pitra-dosha",
+    kind: "dosha",
+    detail: reasons.join("; "),
+    strength: cancelledBy.length ? 1 : reasons.length > 1 ? 3 : 2,
+    ...(cancelledBy.length ? { cancelledBy } : {}),
   };
 }

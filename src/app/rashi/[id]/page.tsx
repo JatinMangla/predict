@@ -30,6 +30,7 @@ import { SIGN_LORDS, SIGN_NAMES, NAKSHATRA_NAMES } from "@/lib/astro/constants";
 import type { PlanetId } from "@/lib/astro/types";
 import { callAi, aiAvailable, aiErrorKey, fmtCost } from "@/lib/aiClient";
 import { useAiQuota } from "@/lib/useAiQuota";
+import { useCurrentPlace } from "@/lib/place";
 import {
   fmtDate,
   fmtDegInSign,
@@ -67,6 +68,7 @@ export default function RashiPage({ params }: { params: Promise<{ id: string }> 
   const [pickedDate, setPickedDate] = useState(() => isoDate(new Date()));
   const [weekAnchor, setWeekAnchor] = useState(() => weekStart(Date.now()));
   const { cfg, usage } = useAiQuota();
+  const here = useCurrentPlace();
   const [reading, setReading] = useState<{ text: string; provider: string; costUsd: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -149,7 +151,8 @@ export default function RashiPage({ params }: { params: Promise<{ id: string }> 
       category.karakas,
       from,
       days,
-      tz
+      tz,
+      here ?? undefined
     ).slice(
       0,
       period === "daily" ? 1 : period === "weekly" ? 7 : undefined
@@ -159,7 +162,7 @@ export default function RashiPage({ params }: { params: Promise<{ id: string }> 
       good: bestDays(list, period === "yearly" ? 10 : 6),
       bad: cautionDays(list, 5),
     };
-  }, [kundli, category, period, pickedDate, weekAnchor]);
+  }, [kundli, category, period, pickedDate, weekAnchor, here]);
 
   const canUseAi = cfg !== null && aiAvailable(cfg);
   const quotaExhausted =

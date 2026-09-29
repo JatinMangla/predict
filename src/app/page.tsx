@@ -10,6 +10,7 @@ import { useI18n } from "@/lib/i18n";
 import { AppShell } from "@/components/AppShell";
 import { PanchangCard } from "@/components/kundli/PanchangCard";
 import { computePanchang } from "@/lib/astro/panchang";
+import { useCurrentPlace } from "@/lib/place";
 import { fmtDate } from "@/lib/format";
 import type { PanchangInfo } from "@/lib/astro/types";
 
@@ -18,13 +19,16 @@ export default function DashboardPage() {
   const profiles = useLiveQuery(() => db.profiles.orderBy("createdAt").reverse().toArray(), []);
   const [panchang, setPanchang] = useState<PanchangInfo | null>(null);
 
-  // Today's panchang for Delhi by default (or the first profile's place)
+  // Today's panchang where you are (Settings), else the first profile's
+  // birthplace, else Delhi
+  const here = useCurrentPlace();
   const place = useMemo(() => {
+    if (here) return { lat: here.latitude, lon: here.longitude };
     const p = profiles?.[0];
     return p
       ? { lat: p.latitude, lon: p.longitude }
       : { lat: 28.6139, lon: 77.209 };
-  }, [profiles]);
+  }, [profiles, here]);
 
   useEffect(() => {
     const now = new Date();

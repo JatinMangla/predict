@@ -19,6 +19,7 @@ import {
 } from "@/lib/astro/precisionTiming";
 import { callAi, aiAvailable, aiErrorKey, fmtCost } from "@/lib/aiClient";
 import { useAiQuota } from "@/lib/useAiQuota";
+import { useCurrentPlace } from "@/lib/place";
 import { fmtDate, fmtTime, planetName } from "@/lib/format";
 
 const DAY_MS = 86400 * 1000;
@@ -51,6 +52,7 @@ export default function TimingPage({ params }: { params: Promise<{ id: string }>
   const [pickedDate, setPickedDate] = useState(() => isoDate(new Date()));
   const [weekAnchor, setWeekAnchor] = useState(() => weekStart(Date.now()));
   const { cfg, usage } = useAiQuota();
+  const here = useCurrentPlace();
   const [reading, setReading] = useState<{ text: string; provider: string; costUsd: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -69,9 +71,10 @@ export default function TimingPage({ params }: { params: Promise<{ id: string }>
       category.houses,
       category.karakas,
       scope,
-      new Date().getTimezoneOffset()
+      new Date().getTimezoneOffset(),
+      here ?? undefined
     );
-  }, [kundli, category, scope]);
+  }, [kundli, category, scope, here]);
 
   const canUseAi = cfg !== null && aiAvailable(cfg);
   const quotaExhausted =

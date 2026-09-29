@@ -227,4 +227,39 @@ export const YOGA_MEANINGS: Record<string, { name: Bi; meaning: Bi }> = {
       hi: "लग्नेश की शुभ स्थिति — जीवनी शक्ति, आत्मनिर्णय और बाधाओं को पार करने की क्षमता।",
     },
   },
+  "dharma-karmadhipati": {
+    name: { en: "Dharma-Karmadhipati Yoga", hi: "धर्म-कर्माधिपति योग" },
+    meaning: {
+      en: "The lords of fortune (9th) and action (10th) join hands — the foremost raja yoga: rise through righteous work, authority and lasting recognition, strongest in their dashas.",
+      hi: "भाग्येश (9) और कर्मेश (10) का संबंध — सर्वोत्तम राजयोग: धर्मयुक्त कर्म से उन्नति, अधिकार और स्थायी प्रतिष्ठा; इनकी दशा में विशेष फल।",
+    },
+  },
+  mahabhagya: {
+    name: { en: "Mahabhagya Yoga", hi: "महाभाग्य योग" },
+    meaning: {
+      en: "Lagna, Sun and Moon in signs of the same gender matched to day/night birth — generosity, good fortune, long life and public esteem (BPHS).",
+      hi: "लग्न, सूर्य व चंद्र का दिन/रात्रि जन्म के अनुरूप सम/विषम राशियों में होना — उदारता, सौभाग्य, दीर्घायु और लोक-सम्मान (बृहत् पाराशर)।",
+    },
+  },
+  vasumati: {
+    name: { en: "Vasumati Yoga", hi: "वसुमती योग" },
+    meaning: {
+      en: "Benefics in the growth houses (3, 6, 10, 11) — wealth that keeps increasing with age and effort.",
+      hi: "उपचय भावों (3, 6, 10, 11) में शुभ ग्रह — आयु व परिश्रम के साथ निरंतर बढ़ता धन।",
+    },
+  },
+  daridra: {
+    name: { en: "Daridra Yoga", hi: "दरिद्र योग" },
+    meaning: {
+      en: "The lord of gains sits in a dusthana — income leaks through debts, expenses or disputes; disciplined saving and avoiding speculation matter more than for most.",
+      hi: "लाभेश दुःस्थान में — ऋण, व्यय या विवाद से आय का रिसाव; नियमित बचत और सट्टे से दूरी अधिक आवश्यक।",
+    },
+  },
+  "pitra-dosha": {
+    name: { en: "Pitra Dosha", hi: "पितृ दोष" },
+    meaning: {
+      en: "The Sun (father, ancestry) afflicted by Rahu or Saturn, or Rahu in the 9th — friction with the father or in ancestral matters, delays in fortune. Traditionally eased by Shraddha/Tarpan and service to elders.",
+      hi: "सूर्य (पिता, वंश) पर राहु/शनि का प्रभाव या नवम में राहु — पिता या पैतृक विषयों में तनाव, भाग्य में विलंब। परंपरागत रूप से श्राद्ध/तर्पण और वृद्धों की सेवा से शमन।",
+    },
+  },
 };

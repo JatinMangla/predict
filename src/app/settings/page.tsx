@@ -6,11 +6,14 @@ import { useI18n } from "@/lib/i18n";
 import { db, getSetting, setSetting } from "@/lib/db";
 import { setAiSetting, fmtCost, fmtDuration, fmtUntil } from "@/lib/aiClient";
 import { useAiQuota } from "@/lib/useAiQuota";
+import { CitySearch } from "@/components/forms/CitySearch";
+import { useCurrentPlace, setCurrentPlace } from "@/lib/place";
 
 export default function SettingsPage() {
   const { t, lang, setLang } = useI18n();
   const [chartStyle, setChartStyle] = useState<"north" | "south">("north");
   const { cfg, usage, refresh } = useAiQuota();
+  const here = useCurrentPlace();
   const [keyInput, setKeyInput] = useState("");
   const [message, setMessage] = useState("");
   const [keyMessage, setKeyMessage] = useState("");
@@ -118,6 +121,39 @@ export default function SettingsPage() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Where the user is now — drives sunrise-based timings */}
+        <div className="card space-y-3 p-5">
+          <div>
+            <h2 className="font-medium text-(--color-gold-soft)">
+              📍 {lang === "hi" ? "आप अभी कहाँ हैं" : "Where you are now"}
+            </h2>
+            <p className="mt-1 text-xs text-(--color-ink-soft)">
+              {lang === "hi"
+                ? "राहु काल, अभिजीत, चौघड़िया, पंचांग और दिन-फल स्थानीय सूर्योदय से बनते हैं — यह आपके वर्तमान शहर का होना चाहिए, जन्म स्थान का नहीं।"
+                : "Rahu Kaal, Abhijit, choghadiya, panchang and day scores depend on local sunrise — they must use the city you live in now, not your birth place."}
+            </p>
+          </div>
+          <CitySearch
+            value={here?.place ?? ""}
+            onPick={(c) => void setCurrentPlace(c)}
+          />
+          <p className="text-xs text-(--color-ink-soft)">
+            {here
+              ? `✓ ${here.place} · ${here.latitude.toFixed(2)}°, ${here.longitude.toFixed(2)}°`
+              : lang === "hi"
+                ? "सेट नहीं — जन्म स्थान प्रयोग हो रहा है।"
+                : "Not set — each profile's birth place is used instead."}
+            {here && (
+              <button
+                onClick={() => void setCurrentPlace(null)}
+                className="ml-2 underline"
+              >
+                {lang === "hi" ? "हटाएँ" : "clear"}
+              </button>
+            )}
+          </p>
         </div>
 
         {/* ── AI control panel ─────────────────────────────────── */}

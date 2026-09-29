@@ -116,7 +116,9 @@ export function buildKundliSummary(kundli: Kundli) {
     sadeSati: ss,
     yogas: kundli.yogas.map((y) => {
       const name = YOGA_MEANINGS[y.key]?.name.en ?? y.key;
-      return `${name} (${y.detail})`;
+      return y.cancelledBy?.length
+        ? `${name} (${y.detail}) — CANCELLED by: ${y.cancelledBy.join("; ")}`
+        : `${name} (${y.detail})`;
     }),
     moonNakshatra: `${NAKSHATRA_NAMES[natalMoon.nakshatra].en} pada ${natalMoon.pada}`,
     birthDate: kundli.birth.localDateTime.slice(0, 10),
